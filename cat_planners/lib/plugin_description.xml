@@ -1,0 +1,11 @@
+<library path="lib/libcat_planners">
+  <class name="cat_planners/LinearJointStepper" type="cat_planners::LinearJointStepper" base_class_type="planning_interface::Planner">
+    <description>
+    </description>
+  </class>
+  <class name="cat_planners/ConvexConstraintSolver" type="cat_planners::ConvexConstraintSolver" base_class_type="planning_interface::Planner">
+    <description>
+    </description>
+  </class>
+</library>
+
