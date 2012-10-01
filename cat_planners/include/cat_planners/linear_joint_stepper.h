@@ -1,5 +1,5 @@
-#ifndef LOCAL_PLANNERS_LINEAR_JOINT_STEPPER_H
-#define LOCAL_PLANNERS_LINEAR_JOINT_STEPPER_H
+#ifndef CAT_PLANNERS_LINEAR_JOINT_STEPPER_H
+#define CAT_PLANNERS_LINEAR_JOINT_STEPPER_H
 
 #include <urdf_model/model.h>
 #include <moveit_msgs/GetMotionPlan.h>
@@ -68,4 +68,4 @@ class LinearJointStepper : public planning_interface::Planner
 
 } // cat_planners
 
-#endif // LOCAL_PLANNERS_LINEAR_JOINT_STEPPER_H
+#endif // CAT_PLANNERS_LINEAR_JOINT_STEPPER_H

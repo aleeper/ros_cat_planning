@@ -1,5 +1,5 @@
-#ifndef LOCAL_PLANNERS_UTIL_H
-#define LOCAL_PLANNERS_UTIL_H
+#ifndef CAT_PLANNERS_UTIL_H
+#define CAT_PLANNERS_UTIL_H
 
 #include <ros/ros.h>
 
@@ -11,7 +11,7 @@
 #include <planning_models/conversions.h>
 
 
-namespace local_planners {
+namespace cat_planners {
 
   inline double normalizeAngle( double angle )
   {

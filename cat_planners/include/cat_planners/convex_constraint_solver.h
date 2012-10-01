@@ -1,5 +1,5 @@
-#ifndef LOCAL_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
-#define LOCAL_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
+#ifndef CAT_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
+#define CAT_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
 
 #include <planning_scene/planning_scene.h>
 #include <moveit_msgs/GetMotionPlan.h>
@@ -66,4 +66,4 @@ class ConvexConstraintSolver : public planning_interface::Planner
 
 } // cat_planners
 
-#endif // LOCAL_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
+#endif // CAT_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
