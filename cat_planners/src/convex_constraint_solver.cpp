@@ -63,7 +63,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(group_name == "left_arm") { ee_group_name = "l_end_effector"; ee_control_frame = "l_wrist_roll_link"; }
 
 
-  ROS_WARN("Solving for group [%s], end-effector [%s], control frame [%s] using ConvexConstraintSolver!", group_name.c_str(), ee_group_name.c_str(), ee_control_frame.c_str());
+  ROS_DEBUG("Solving for group [%s], end-effector [%s], control frame [%s] using ConvexConstraintSolver!", group_name.c_str(), ee_group_name.c_str(), ee_control_frame.c_str());
 
 
 
@@ -129,6 +129,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         }
         else
         {
+          // TODO this is... sort of a hack. Can we add scalars to the constraints that allow us to "turn them off"?
           limits_min[joint_index] = -1E3;
           limits_max[joint_index] =  1E3;
         }
@@ -156,20 +157,21 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         Eigen::Vector3d point =     vec[contact_index].pos;
         Eigen::Vector3d normal =  vec[contact_index].normal;
         double depth = vec[contact_index].depth;
-        ROS_INFO("Contact between [%s] and [%s] point: %.2f %.2f %.2f normal: %.2f %.2f %.2f depth: %.3f",
-                 contact1.c_str(), contact2.c_str(),
-                 point(0), point(1), point(2),
-                 normal(0), normal(1), normal(2),
-                 depth);
+//        ROS_INFO("Contact between [%s] and [%s] point: %.2f %.2f %.2f normal: %.2f %.2f %.2f depth: %.3f",
+//                 contact1.c_str(), contact2.c_str(),
+//                 point(0), point(1), point(2),
+//                 normal(0), normal(1), normal(2),
+//                 depth);
         // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
         std::string group_contact;
         if(      jmg->hasLinkModel(contact1) || ee_jmg->hasLinkModel(contact1) ) group_contact = contact1;
         else if( jmg->hasLinkModel(contact2) || ee_jmg->hasLinkModel(contact2) ) group_contact = contact2;
         else
         {
-          ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
+          //ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
           continue;
         }
+
         planning_models::KinematicState::LinkState *link_state = start_state.getLinkState(group_contact);
         Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
         point = link_T_world*point;
@@ -178,6 +180,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         if(jsg->getJacobian(group_contact, point, jacobian))
         {
           contact_jacobians.push_back(jacobian);
+          if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
+            normal = -1.0*normal;
           contact_normals.push_back(normal);
         }
       }
@@ -381,7 +385,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   num_iters = cvx.solve();
   if(!cvx.work.converged)
   {
-    printf("solving failed to converge in %ld iterations.\n", num_iters);
+    ROS_WARN("solving failed to converge in %ld iterations.", num_iters);
     return false;
   }
 
@@ -389,7 +393,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
 
 
-  ROS_INFO("Finished solving in %ld iterations, unpacking data...", num_iters);
+  ROS_DEBUG("Finished solving in %ld iterations, unpacking data...", num_iters);
   Eigen::VectorXd joint_deltas(N);
   std::map<std::string, double> goal_update;
   for(size_t joint_index = 0; joint_index < joint_names.size(); joint_index++)
@@ -403,10 +407,10 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
   //ROS_INFO("Raw Error: translate [%.3f, %.3f, %.3f]",
   //         x_error(0), x_error(1), x_error(2));
-  ROS_INFO("ClipError: translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
+  ROS_DEBUG("ClipError: translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
            delta_x(0), delta_x(1), delta_x(2),
            delta_euler[0], delta_euler[1], delta_euler[2]);
-  ROS_INFO("Output:    translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
+  ROS_DEBUG("Output:    translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
            cartesian_deltas(0), cartesian_deltas(1), cartesian_deltas(2),
            cartesian_deltas(3), cartesian_deltas(4), cartesian_deltas(5));
 
