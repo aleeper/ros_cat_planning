@@ -150,6 +150,15 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       std::string contact1 = it->first.first;
       std::string contact2 = it->first.second;
+      std::string group_contact;
+      if(      jmg->hasLinkModel(contact1) || ee_jmg->hasLinkModel(contact1) ) group_contact = contact1;
+      else if( jmg->hasLinkModel(contact2) || ee_jmg->hasLinkModel(contact2) ) group_contact = contact2;
+      else
+      {
+        //ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
+        continue;
+      }
+
       const std::vector<collision_detection::Contact>& vec = it->second;
 
       for(size_t contact_index = 0; contact_index < vec.size(); contact_index++)
@@ -163,15 +172,6 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 //                 normal(0), normal(1), normal(2),
 //                 depth);
         // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
-        std::string group_contact;
-        if(      jmg->hasLinkModel(contact1) || ee_jmg->hasLinkModel(contact1) ) group_contact = contact1;
-        else if( jmg->hasLinkModel(contact2) || ee_jmg->hasLinkModel(contact2) ) group_contact = contact2;
-        else
-        {
-          //ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
-          continue;
-        }
-
         planning_models::KinematicState::LinkState *link_state = start_state.getLinkState(group_contact);
         Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
         point = link_T_world*point;
@@ -180,8 +180,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         if(jsg->getJacobian(group_contact, point, jacobian))
         {
           contact_jacobians.push_back(jacobian);
-          if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
-            normal = -1.0*normal;
+//          if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
+//            normal = -1.0*normal;
           contact_normals.push_back(normal);
         }
       }
