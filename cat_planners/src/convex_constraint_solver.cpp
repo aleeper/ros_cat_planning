@@ -423,8 +423,9 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ======== Step toward constrained goal, checking for new collisions along the way ========
 
   //double proxy_goal_tolerance = 0.1;
-  double interpolation_progress = 0.0;
-  double interpolation_step = 0.34;
+  // TODO magic number
+  double interpolation_step = 0.333;
+  double interpolation_progress = interpolation_step;
   collision_detection::CollisionResult collision_result;
   while(interpolation_progress <= 1.0)
   {
@@ -477,7 +478,6 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   sensor_msgs::JointState js;
 
   planning_models::kinematicStateToJointState(proxy_state, js);
-  //const planning_models::KinematicModel::JointModelGroup *jmg = a_planning_scene->getKinematicModel()->getJointModelGroup(req.motion_plan_request.group_name);
 
   // getJointNames
   for(size_t i = 0 ; i < js.name.size(); i++)
