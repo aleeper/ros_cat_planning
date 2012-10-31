@@ -449,7 +449,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
     if(collision_result.collision)
     {
-      const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::OCTOMAP_NS);
+      const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
       collision_detection::refineContactNormals(octomap_object, collision_result, false);
       // TODO this is a hack way of passing this information.
       if(req.motion_plan_request.num_planning_attempts > 1)
