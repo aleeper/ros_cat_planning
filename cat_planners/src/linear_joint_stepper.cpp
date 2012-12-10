@@ -1,8 +1,8 @@
 #include <cat_planners/util.h>
 #include <cat_planners/linear_joint_stepper.h>
 #include <pluginlib/class_list_macros.h>
-#include <planning_models/kinematic_model.h>
-#include <planning_interface/planning_interface.h>
+#include <moveit/kinematic_model/kinematic_model.h>
+#include <moveit/planning_interface/planning_interface.h>
 
 
 namespace cat_planners{
@@ -13,10 +13,10 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
 {
   ROS_WARN("Solving using LinearJointStepper!");
 
-  planning_models::KinematicState start_state = planning_scene->getCurrentState();
-  planning_models::robotStateToKinematicState(*(planning_scene->getTransforms()), req.motion_plan_request.start_state, start_state);
+  kinematic_state::KinematicState start_state = planning_scene->getCurrentState();
+  kinematic_state::robotStateToKinematicState(*(planning_scene->getTransforms()), req.motion_plan_request.start_state, start_state);
 
-  planning_models::KinematicState goal_state = start_state;
+  kinematic_state::KinematicState goal_state = start_state;
   const moveit_msgs::Constraints &c = req.motion_plan_request.goal_constraints[0];
   std::map<std::string, double> update;
   for (std::size_t i = 0 ; i < c.joint_constraints.size() ; ++i)
@@ -28,9 +28,9 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
 //  steps = std::min<unsigned int>(steps, 6);
   unsigned int MAX_STEPS = 6;
 
-  std::vector<planning_models::KinematicStatePtr> path;
+  std::vector<kinematic_state::KinematicStatePtr> path;
   if(planning_scene->isStateValid(start_state))
-    path.push_back(planning_models::KinematicStatePtr(new planning_models::KinematicState(start_state)));
+    path.push_back(kinematic_state::KinematicStatePtr(new kinematic_state::KinematicState(start_state)));
   else
   {
     ROS_ERROR("Can't plan, start state is not valid.");
@@ -43,16 +43,16 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
 
   if (steps < 3)
   {
-    //planning_models::KinematicStatePtr point = planning_models::KinematicStatePtr(new planning_models::KinematicState(goal_state));
+    //kinematic_state::KinematicStatePtr point = kinematic_state::KinematicStatePtr(new kinematic_state::KinematicState(goal_state));
 
     if (planning_scene->isStateValid(goal_state))
-      path.push_back(planning_models::KinematicStatePtr(new planning_models::KinematicState(goal_state)));
+      path.push_back(kinematic_state::KinematicStatePtr(new kinematic_state::KinematicState(goal_state)));
   }
   else
   {
     for (size_t s = 1 ; s <= MAX_STEPS ; ++s)
     {
-      planning_models::KinematicStatePtr point = planning_models::KinematicStatePtr(new planning_models::KinematicState(start_state));
+      kinematic_state::KinematicStatePtr point = kinematic_state::KinematicStatePtr(new kinematic_state::KinematicState(start_state));
       createKinematicStatePoint(planning_scene, start_state, goal_state, update, s, steps, point);
       if (planning_scene->isStateValid(*point))
         path.push_back(point);
@@ -73,10 +73,10 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
   {
 
     sensor_msgs::JointState js;
-    planning_models::kinematicStateToJointState(*(path.back()), js);
+    kinematic_state::kinematicStateToJointState(*(path.back()), js);
     trajectory_msgs::JointTrajectoryPoint pt;
 
-    const planning_models::KinematicModel::JointModelGroup *jmg = planning_scene->getKinematicModel()->getJointModelGroup(req.motion_plan_request.group_name);
+    const kinematic_model::JointModelGroup *jmg = planning_scene->getKinematicModel()->getJointModelGroup(req.motion_plan_request.group_name);
 
     // getJointNames
     for(size_t i = 0 ; i < js.name.size(); i++)

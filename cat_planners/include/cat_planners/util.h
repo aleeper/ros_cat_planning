@@ -6,9 +6,9 @@
 #include <urdf_model/model.h>
 #include <moveit_msgs/GetMotionPlan.h>
 #include <moveit_msgs/MotionPlanDetailedResponse.h>
-#include <planning_scene/planning_scene.h>
-#include <planning_interface/planning_interface.h>
-#include <planning_models/conversions.h>
+#include <moveit/planning_scene/planning_scene.h>
+#include <moveit/planning_interface/planning_interface.h>
+#include <moveit/kinematic_state/conversions.h>
 
 
 namespace cat_planners {
@@ -24,7 +24,7 @@ namespace cat_planners {
 
 
 
-  inline void printCollisionInfo(const planning_scene::PlanningScene& ps, const planning_models::KinematicState& ks )
+  inline void printCollisionInfo(const planning_scene::PlanningScene& ps, const kinematic_state::KinematicState& ks )
   {
 
     collision_detection::CollisionRequest req;
@@ -59,17 +59,17 @@ namespace cat_planners {
   }
 
   inline void createKinematicStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                                        planning_models::KinematicState &start_state,
-                                        planning_models::KinematicState &goal_state,
+                                        kinematic_state::KinematicState &start_state,
+                                        kinematic_state::KinematicState &goal_state,
                                         std::map<std::string, double> &name_map,
                                         double step_size,
-                                        planning_models::KinematicStatePtr &point)
+                                        kinematic_state::KinematicStatePtr &point)
   {
     for (std::map<std::string, double>::const_iterator it = name_map.begin() ; it != name_map.end() ; ++it)
     {
       double sv = start_state.getJointState(it->first)->getVariableValues()[0];
       double gv = goal_state.getJointState(it->first)->getVariableValues()[0];
-      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getLimits();
+      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getVariableLimits();
       double u = 0;
       //moveit_msgs::JointLimits &limit = limits[0];
 
@@ -88,16 +88,16 @@ namespace cat_planners {
   }
 
   inline void createKinematicStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                                 planning_models::KinematicState &start_state, planning_models::KinematicState &goal_state,
+                                 kinematic_state::KinematicState &start_state, kinematic_state::KinematicState &goal_state,
                                  std::map<std::string, double> &name_map,
                                  unsigned int step_index, unsigned int num_steps,
-                                 planning_models::KinematicStatePtr &point)
+                                 kinematic_state::KinematicStatePtr &point)
   {
     for (std::map<std::string, double>::const_iterator it = name_map.begin() ; it != name_map.end() ; ++it)
     {
       double sv = start_state.getJointState(it->first)->getVariableValues()[0];
       double gv = goal_state.getJointState(it->first)->getVariableValues()[0];
-      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getLimits();
+      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getVariableLimits();
       double u = 0;
       //moveit_msgs::JointLimits &limit = limits[0];
 

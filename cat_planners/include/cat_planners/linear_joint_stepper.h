@@ -4,9 +4,9 @@
 #include <urdf_model/model.h>
 #include <moveit_msgs/GetMotionPlan.h>
 #include <moveit_msgs/MotionPlanDetailedResponse.h>
-#include <planning_scene/planning_scene.h>
-#include <planning_interface/planning_interface.h>
-#include <planning_models/conversions.h>
+#include <moveit/planning_scene/planning_scene.h>
+#include <moveit/planning_interface/planning_interface.h>
+#include <moveit/kinematic_state/conversions.h>
 
 
 namespace cat_planners
@@ -20,7 +20,7 @@ class LinearJointStepper : public planning_interface::Planner
 
     /*********************************************************/
     /// Subclass may implement methods below
-    virtual void init(const planning_models::KinematicModelConstPtr& model) {}
+    virtual void init(const kinematic_model::KinematicModelConstPtr& model) {}
 
     /// Get a short string that identifies the planning interface
     virtual std::string getDescription(void) const { return "Adam's potential field planner/solver."; }
@@ -52,8 +52,7 @@ class LinearJointStepper : public planning_interface::Planner
     }
 
     /// Determine whether this plugin instance is able to represent this planning request
-    virtual bool canServiceRequest(const moveit_msgs::GetMotionPlan::Request &req,
-                                   planning_interface::PlannerCapability& capabilities) const
+    virtual bool canServiceRequest(const moveit_msgs::GetMotionPlan::Request &req) const
     {
       printf("This planner is allowing all motion planning requests, and may not be doing the right thing...");
       return true;
