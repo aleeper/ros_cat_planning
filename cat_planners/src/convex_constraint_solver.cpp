@@ -472,30 +472,16 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ======== Convert proxy state to a "trajectory" ========
   //ROS_INFO("Converting proxy to a trajectory, and returning...");
 
-  moveit_msgs::RobotTrajectory rt;
-  trajectory_msgs::JointTrajectory traj;
-  trajectory_msgs::JointTrajectoryPoint pt;
-  sensor_msgs::JointState js;
+  trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
 
-  kinematic_state::kinematicStateToJointState(proxy_state, js);
+  std::vector<kinematic_state::KinematicState*> states;
+  states.push_back(&start_state);
+  states.push_back(&proxy_state);
 
-  // getJointNames
-  for(size_t i = 0 ; i < js.name.size(); i++)
-  {
-    std::string name = js.name[i];
-    if( !jmg->hasJointModel(name) ) continue;
+  kinematicStateVectorToJointTrajectory(states, group_name, traj);
+  traj.header.frame_id = planning_frame;
 
-    traj.joint_names.push_back(js.name[i]);
-    pt.positions.push_back(js.position[i]);
-    if(js.velocity.size()) pt.velocities.push_back(js.velocity[i]);
-  }
-  pt.time_from_start = ros::Duration(req.motion_plan_request.allowed_planning_time*1.0);
-  traj.points.push_back(pt);
-
-  traj.header.stamp = ros::Time::now();
-  traj.header.frame_id = "odom_combined";
-
-  res.trajectory.joint_trajectory = traj;
+  res.trajectory_start = req.motion_plan_request.start_state;
 
   return true;
 }
