@@ -2,7 +2,8 @@
 #define CAT_PLANNERS_LINEAR_JOINT_STEPPER_H
 
 #include <urdf_model/model.h>
-#include <moveit_msgs/GetMotionPlan.h>
+#include <moveit_msgs/MotionPlanRequest.h>
+#include <moveit_msgs/MotionPlanResponse.h>
 #include <moveit_msgs/MotionPlanDetailedResponse.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_interface/planning_interface.h>
@@ -16,7 +17,7 @@ class LinearJointStepper : public planning_interface::Planner
 {
   public:
     LinearJointStepper() {}
-    virtual ~LinearJointStepper() {};
+    virtual ~LinearJointStepper() {}
 
     /*********************************************************/
     /// Subclass may implement methods below
@@ -31,15 +32,15 @@ class LinearJointStepper : public planning_interface::Planner
     /**********************************************************/
     /// Subclass must implement methods below
     virtual bool solve(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                       const moveit_msgs::GetMotionPlan::Request &req,
-                       moveit_msgs::GetMotionPlan::Response &res) const;
+                       const moveit_msgs::MotionPlanRequest &req,
+                       moveit_msgs::MotionPlanResponse &res) const;
 
 
     virtual bool solve(const planning_scene::PlanningSceneConstPtr& planning_scene,
-               const moveit_msgs::GetMotionPlan::Request &req,
-               moveit_msgs::MotionPlanDetailedResponse &res) const
+                       const moveit_msgs::MotionPlanRequest &req,
+                       moveit_msgs::MotionPlanDetailedResponse &res) const
     {
-      moveit_msgs::GetMotionPlan::Response res2;
+      moveit_msgs::MotionPlanResponse res2;
       if (solve(planning_scene, req, res2))
       {
         res.trajectory_start = res2.trajectory_start;
@@ -52,7 +53,7 @@ class LinearJointStepper : public planning_interface::Planner
     }
 
     /// Determine whether this plugin instance is able to represent this planning request
-    virtual bool canServiceRequest(const moveit_msgs::GetMotionPlan::Request &req) const
+    virtual bool canServiceRequest(const moveit_msgs::MotionPlanRequest &req) const
     {
       printf("This planner is allowing all motion planning requests, and may not be doing the right thing...");
       return true;

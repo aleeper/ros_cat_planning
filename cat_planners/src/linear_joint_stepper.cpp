@@ -8,16 +8,16 @@
 namespace cat_planners{
 
 bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                   const moveit_msgs::GetMotionPlan::Request &req,
-                   moveit_msgs::GetMotionPlan::Response &res) const
+                   const moveit_msgs::MotionPlanRequest &req,
+                   moveit_msgs::MotionPlanResponse &res) const
 {
-  ROS_WARN("Solving using LinearJointStepper!");
+  ROS_DEBUG("Solving using LinearJointStepper!");
 
   kinematic_state::KinematicState start_state = planning_scene->getCurrentState();
-  kinematic_state::robotStateToKinematicState(*(planning_scene->getTransforms()), req.motion_plan_request.start_state, start_state);
+  kinematic_state::robotStateToKinematicState(*(planning_scene->getTransforms()), req.start_state, start_state);
 
   kinematic_state::KinematicState goal_state = start_state;
-  const moveit_msgs::Constraints &c = req.motion_plan_request.goal_constraints[0];
+  const moveit_msgs::Constraints &c = req.goal_constraints[0];
   std::map<std::string, double> update;
   for (std::size_t i = 0 ; i < c.joint_constraints.size() ; ++i)
   {
@@ -76,7 +76,7 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
     kinematic_state::kinematicStateToJointState(*(path.back()), js);
     trajectory_msgs::JointTrajectoryPoint pt;
 
-    const kinematic_model::JointModelGroup *jmg = planning_scene->getKinematicModel()->getJointModelGroup(req.motion_plan_request.group_name);
+    const kinematic_model::JointModelGroup *jmg = planning_scene->getKinematicModel()->getJointModelGroup(req.group_name);
 
     // getJointNames
     for(size_t i = 0 ; i < js.name.size(); i++)
