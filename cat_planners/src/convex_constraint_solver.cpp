@@ -490,7 +490,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     ros::Duration time_remaining = planning_time_limit - ros::Time::now();
     ROS_DEBUG_NAMED("cvx_solver", "Completed interpolation at %.3f, have %.3f sec of %.3f sec remaining. ",
                     interpolation_progress, time_remaining.toSec(), req.motion_plan_request.allowed_planning_time.toSec());
-    if(time_remaining.toSec() < 0.0)
+    if(time_remaining.toSec() < 0.005) // TODO magic number based on observations
       break;
 
     // TODO Use proxy_goal_tolerance to exit if we are close enough!
