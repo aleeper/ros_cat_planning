@@ -85,6 +85,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   {
     ROS_WARN("Subgroups are not supported yet! (Group [%s] has %zd subgroups.) Aborting... ",
              group_name.c_str(), subgroup_names.size());
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
     return false;
   }
 
@@ -103,6 +104,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(ee_index == -1)
   {
     ROS_WARN("Did not find any end-effectors attached to group [%s]! Aborting...", group_name.c_str());
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
     return false;
   }
 
@@ -226,6 +228,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   {
     ROS_ERROR("Currently require exactly one position and orientation constraint. (Have %zd and %zd.) Aborting...",
               c.position_constraints.size(), c.orientation_constraints.size());
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
     return false;
   }
   moveit_msgs::PositionConstraint    pc = c.position_constraints[0];
@@ -237,15 +240,16 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   {
     ROS_ERROR("Position [%s] and orientation [%s] goals are not for the same link. Aborting...",
               pc.link_name.c_str(), oc.link_name.c_str());
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
     return false;
   }
   if(pc.constraint_region.primitive_poses.size() != 1)
   {
     if(pc.constraint_region.primitive_poses.size() == 0)
       ROS_ERROR("No primitive_pose specified for position constraint region. Aborting...");
-
     if(pc.constraint_region.primitive_poses.size() > 1)
       ROS_ERROR("Should only specificy one primitice_pose for goal region. Aborting...");
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
     return false;
   }
 
@@ -321,6 +325,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(!jsg->getJacobian(ee_control_frame , ee_point_in_ee_frame , ee_jacobian))
   {
     ROS_ERROR("Unable to get end-effector Jacobian! Can't plan, exiting...");
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME;
     return false;
   }
 
@@ -410,6 +415,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(!cvx.work.converged)
   {
     ROS_WARN("solving failed to converge in %ld iterations.", num_iters);
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
     return false;
   }
 
@@ -513,6 +519,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   kinematicStateVectorToJointTrajectory(states, group_name, traj);
   traj.header.frame_id = planning_frame;
   res.trajectory_start = req.start_state;
+  res.group_name = group_name;
+  res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
   ROS_DEBUG_NAMED("cvx_solver", "CVX planning done, returning.");
   return true;
