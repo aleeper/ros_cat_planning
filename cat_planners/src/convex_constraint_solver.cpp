@@ -189,14 +189,10 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
     for(size_t contact_index = 0; contact_index < vec.size(); contact_index++)
     {
-      Eigen::Vector3d point =     vec[contact_index].pos;
+      Eigen::Vector3d point =   vec[contact_index].pos;
       Eigen::Vector3d normal =  vec[contact_index].normal;
       double depth = vec[contact_index].depth;
-      ROS_DEBUG_NAMED("cvx_solver", "Contact between [%s] and [%s] point: %.2f %.2f %.2f normal: %.2f %.2f %.2f depth: %.3f",
-               contact1.c_str(), contact2.c_str(),
-               point(0), point(1), point(2),
-               normal(0), normal(1), normal(2),
-               depth);
+
       // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
       kinematic_state::LinkState *link_state = start_state.getLinkState(group_contact);
       Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
@@ -206,10 +202,15 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       if(jsg->getJacobian(group_contact, point, jacobian))
       {
         contact_jacobians.push_back(jacobian);
-//          if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
-//            normal = -1.0*normal;
+        if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
+          normal = -1.0*normal;
         contact_normals.push_back(normal);
       }
+      ROS_DEBUG_NAMED("cvx_solver", "Contact between [%s] and [%s] point: %.2f %.2f %.2f normal: %.2f %.2f %.2f depth: %.3f",
+               contact1.c_str(), contact2.c_str(),
+               point(0), point(1), point(2),
+               normal(0), normal(1), normal(2),
+               depth);
     }
   }
 
@@ -470,7 +471,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     // get contact set
     collision_detection::CollisionRequest collision_request;
     // TODO magic number
-    collision_request.max_contacts = 20;
+    collision_request.max_contacts = 10;
     collision_request.contacts = true;
     collision_request.distance = false;
     collision_request.verbose = false;
@@ -481,7 +482,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     if(collision_result.collision)
     {
       const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
-      collision_detection::refineContactNormals(octomap_object, collision_result, false);
+      //collision_detection::refineContactNormals(octomap_object, collision_result, false);
       if(only_velocity_constraint)
       {
         ROS_DEBUG_NAMED("cvx_solver", "Saving the proxy point in collision because we are just doing velocity constraint.");
