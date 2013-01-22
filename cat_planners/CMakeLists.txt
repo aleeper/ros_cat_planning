@@ -50,6 +50,7 @@ add_library(cat_planners
   src/linear_joint_stepper.cpp
   src/convex_constraint_solver.cpp
 )
+add_dependencies(cat_planners moveit_msgs_gencpp)
 
 target_link_libraries(cat_planners cvx_solvers)
 
