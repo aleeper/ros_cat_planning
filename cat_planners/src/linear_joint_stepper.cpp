@@ -102,7 +102,5 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
 
 } // namespace cat_planners
 
-PLUGINLIB_DECLARE_CLASS(cat_planners, LinearJointStepper,
-                        cat_planners::LinearJointStepper,
-                        planning_interface::Planner)
+PLUGINLIB_EXPORT_CLASS( cat_planners::LinearJointStepper, planning_interface::Planner)
 

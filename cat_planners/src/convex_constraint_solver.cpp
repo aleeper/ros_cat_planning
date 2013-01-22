@@ -529,7 +529,5 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
 } // namespace cat_planners
 
-PLUGINLIB_DECLARE_CLASS(cat_planners, ConvexConstraintSolver,
-                        cat_planners::ConvexConstraintSolver,
-                        planning_interface::Planner);
+PLUGINLIB_EXPORT_CLASS( cat_planners::ConvexConstraintSolver, planning_interface::Planner);
 
