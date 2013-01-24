@@ -1,6 +1,7 @@
 #ifndef CAT_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
 #define CAT_PLANNERS_CONVEX_CONSTRAINT_SOLVER_H
 
+#include <cat_planners/CVXConfig.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit_msgs/MotionPlanRequest.h>
 #include <moveit_msgs/MotionPlanResponse.h>
@@ -15,8 +16,8 @@ namespace cat_planners
 class ConvexConstraintSolver : public planning_interface::Planner
 {
   public:
-    ConvexConstraintSolver() {}
-    virtual ~ConvexConstraintSolver() {}
+    ConvexConstraintSolver();
+    virtual ~ConvexConstraintSolver();
 
     /*********************************************************/
     /// Subclass may implement methods below
@@ -61,6 +62,12 @@ class ConvexConstraintSolver : public planning_interface::Planner
     /// Request termination, if a solve() function is currently computing plans
     virtual void terminate(void) const {
     }
+
+protected:
+
+    class DynamicReconfigureImpl;
+    DynamicReconfigureImpl *reconfigure_impl_;
+    cat_planners::CVXConfig config_;
 
 };
 

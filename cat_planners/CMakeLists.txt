@@ -17,7 +17,9 @@ find_package(catkin COMPONENTS
   REQUIRED
 )
 
-#generate_dynamic_reconfigure_options("ompl_interface_ros/cfg/OMPLDynamicReconfigure.cfg")
+generate_dynamic_reconfigure_options(
+  "cfg/CVX.cfg"
+)
 
 catkin_package(
   LIBRARIES
