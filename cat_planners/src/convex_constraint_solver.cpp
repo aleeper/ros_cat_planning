@@ -16,8 +16,9 @@
 CVX_Constraints cvx;
 
 // - - - - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - -
-
 namespace cat_planners {
+
+static const int MAX_PROXY_STATES = 10;
 
 class ConvexConstraintSolver::DynamicReconfigureImpl
 {
@@ -102,8 +103,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   std::string planning_frame = ros::names::resolve("/", a_planning_scene->getPlanningFrame());
 
   // We "getCurrentState" just to populate the structure with auxiliary info, then copy in the transform info from the planning request.
-  kinematic_state::KinematicState start_state = a_planning_scene->getCurrentState();
-  kinematic_state::robotStateToKinematicState(*(a_planning_scene->getTransforms()), req.start_state, start_state);
+  kinematic_state::KinematicStatePtr start_state(new kinematic_state::KinematicState(a_planning_scene->getCurrentState()));
+  kinematic_state::robotStateToKinematicState(*(a_planning_scene->getTransforms()), req.start_state, *start_state);
 
   std::string group_name = req.group_name;
 
@@ -150,10 +151,11 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   // TODO This copying takes about 3 ms!!! Should do something about this...
 
   // constrained_goal_state is the optimization output before interval stepping, proxy_state will be used as we step around.
-  kinematic_state::KinematicState proxy_state = start_state;
-  kinematic_state::KinematicState constrained_goal_state = start_state;
+  std::vector<kinematic_state::KinematicStatePtr> proxy_states;
+  proxy_states.reserve(MAX_PROXY_STATES);                                             // reserve plenty of space... // TODO magic number!
+  kinematic_state::KinematicStatePtr constrained_goal_state( new kinematic_state::KinematicState(*start_state));
 
-  const kinematic_state::JointStateGroup* jsg = proxy_state.getJointStateGroup(group_name);
+  const kinematic_state::JointStateGroup* jsg = start_state->getJointStateGroup(group_name);
   const kinematic_model::JointModelGroup* ee_jmg = a_planning_scene->getKinematicModel()->getJointModelGroup(ee_group_name);
 
 // ====================================================================================================================
@@ -186,7 +188,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       limits_min[joint_index] = -1E3;
       limits_max[joint_index] =  1E3;
     }
-    joint_vector[joint_index] = start_state.getJointState(joint_name)->getVariableValues()[0];
+    joint_vector[joint_index] = start_state->getJointState(joint_name)->getVariableValues()[0];
     joint_names[joint_index] = joint_name;
     ROS_DEBUG_NAMED("cvx_solver_math", "Joint [%d] [%s] has min %.2f, value %.2f, max %.2f",
                     joint_index, joint_name.c_str(), limits_min[joint_index], joint_vector[joint_index], limits_max[joint_index]);
@@ -226,7 +228,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       double depth = vec[contact_index].depth;
 
       // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
-      kinematic_state::LinkState *link_state = start_state.getLinkState(group_contact);
+      kinematic_state::LinkState *link_state = start_state->getLinkState(group_contact);
       Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
       point = link_T_world*point;
 
@@ -306,7 +308,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   }
 
   // Do some transforms...
-  Eigen::Affine3d planning_T_link = start_state.getLinkState(pc.link_name)->getGlobalLinkTransform();
+  Eigen::Affine3d planning_T_link = start_state->getLinkState(pc.link_name)->getGlobalLinkTransform();
   Eigen::Vector3d ee_point_in_ee_frame = Eigen::Vector3d(pc.target_point_offset.x, pc.target_point_offset.y, pc.target_point_offset.z);
   Eigen::Vector3d ee_point_in_planning_frame = planning_T_link*ee_point_in_ee_frame;
 
@@ -468,7 +470,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
                     joint_vector[joint_index],
                     cvx.vars.q_d[joint_index]);
   }
-  constrained_goal_state.setStateValues(goal_update);
+  constrained_goal_state->setStateValues(goal_update);
 
   //  // Compute and print some debug stuff
   //  if(false)
@@ -492,12 +494,14 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   double interpolation_step = config_.quantization_step;
   double interpolation_progress = interpolation_step;
   collision_detection::CollisionResult collision_result;
-  while(interpolation_progress <= 1.0)
+  std::vector<kinematic_state::KinematicStatePtr> states;
+  int state_count = 1;
+  proxy_states.push_back(start_state);
+  while(interpolation_progress <= 1.0 && state_count < MAX_PROXY_STATES)
   {
     // TODO this interpolation scheme might not allow the arm to slide along contacts very well...
-    kinematic_state::KinematicStatePtr point;
-    point.reset(new kinematic_state::KinematicState(constrained_goal_state));
-    start_state.interpolate(constrained_goal_state, interpolation_progress, *point);
+    kinematic_state::KinematicStatePtr point(new kinematic_state::KinematicState(*start_state));
+    start_state->interpolate(*constrained_goal_state, interpolation_progress, *point);
 
     // get contact set
     collision_detection::CollisionRequest collision_request;
@@ -516,23 +520,24 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       if(config_.velocity_constraint_only)
       {
         ROS_DEBUG_NAMED("cvx_solver", "Saving the proxy point in collision because we are just doing velocity constraint.");
-        proxy_state = *point;
+        proxy_states.push_back(point);
       }
       break;
     }
     else
     {
-      proxy_state = *point;
+      proxy_states.push_back(point);
     }
     // Check how much time is left
     ros::Duration time_remaining = planning_time_limit - ros::Time::now();
-    ROS_DEBUG_NAMED("cvx_solver", "Completed interpolation at %.3f, have %.3f sec of %.3f sec remaining. ",
-                    interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
+    ROS_DEBUG_NAMED("cvx_solver", "Completed proxy step %d at %.3f, have %.3f sec of %.3f sec remaining. ",
+                    state_count, interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
     if(time_remaining.toSec() < config_.minimum_reserve_time)
       break;
 
     // TODO Use proxy_goal_tolerance to exit if we are close enough!
     interpolation_progress += interpolation_step;
+    state_count++;
   }
   // Store the last collision result!
   last_collision_result = collision_result;
@@ -541,13 +546,9 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ============================= Create a trajectory from the start and result states =================================
 // ====================================================================================================================
 
-  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %d points.", 2); // TODO should we use intermediate states?
+  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %d points.", state_count); // TODO should we use intermediate states?
   trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
-
-  std::vector<kinematic_state::KinematicState*> states;
-  states.push_back(&start_state);
-  states.push_back(&proxy_state);
-  kinematicStateVectorToJointTrajectory(states, group_name, traj);
+  kinematicStateVectorToJointTrajectory(proxy_states, group_name, traj);
   traj.header.frame_id = planning_frame;
   res.trajectory_start = req.start_state;
   res.group_name = group_name;

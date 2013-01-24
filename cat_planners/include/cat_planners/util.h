@@ -22,13 +22,13 @@ namespace cat_planners {
     return angle;
   }
 
-  inline void kinematicStateVectorToJointTrajectory( const std::vector<kinematic_state::KinematicState*>& states, const std::string& group_name, trajectory_msgs::JointTrajectory & traj)
+  inline void kinematicStateVectorToJointTrajectory( const std::vector<kinematic_state::KinematicStatePtr>& states, const std::string& group_name, trajectory_msgs::JointTrajectory & traj)
   {
     int num_states = states.size();
     traj.points.resize(num_states);
     for(int i = 0; i < num_states; i++)
     {
-      const std::vector<kinematic_state::JointState*> jsv = (*(states[i])).getJointStateGroup(group_name)->getJointStateVector();
+      const std::vector<kinematic_state::JointState*> jsv = states[i]->getJointStateGroup(group_name)->getJointStateVector();
       int num_joints = jsv.size();
       if(i == 0) // only do once per trajectory
         traj.joint_names.resize(num_joints);
