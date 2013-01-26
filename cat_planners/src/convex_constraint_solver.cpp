@@ -64,7 +64,7 @@ ConvexConstraintSolver::~ConvexConstraintSolver()
 
 // This is "global" storage for the last collision state of the joint state group. It is
 // a *TERRIBLE HACK* but I don't know how else to re-use old collision info...
-collision_detection::CollisionResult last_collision_result;
+boost::shared_ptr<collision_detection::CollisionResult> last_collision_result;
 
 
 bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& a_planning_scene,
@@ -206,7 +206,10 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   std::vector<Eigen::MatrixXd> contact_jacobians;
   std::vector<Eigen::Vector3d> contact_normals;
 
-  for( collision_detection::CollisionResult::ContactMap::const_iterator it = last_collision_result.contacts.begin(); it != last_collision_result.contacts.end(); ++it)
+  if(!last_collision_result)
+    last_collision_result.reset(new collision_detection::CollisionResult());
+
+  for( collision_detection::CollisionResult::ContactMap::const_iterator it = last_collision_result->contacts.begin(); it != last_collision_result->contacts.end(); ++it)
   {
     std::string contact1 = it->first.first;
     std::string contact2 = it->first.second;
@@ -236,15 +239,14 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       if(jsg->getJacobian(group_contact, point, jacobian))
       {
         contact_jacobians.push_back(jacobian);
-        if(contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
+        if(!config_.refine_normals && contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
           normal = -1.0*normal;
         contact_normals.push_back(normal);
       }
-      ROS_DEBUG_NAMED("cvx_solver", "Contact between [%s] and [%s] point: %.2f %.2f %.2f normal: %.2f %.2f %.2f depth: %.3f",
+      ROS_DEBUG_NAMED("cvx_solver_contacts", "Contact between [%s] and [%s] p = [%.3f, %.3f %.3f], n = [%.2f %.2f %.2f]",
                contact1.c_str(), contact2.c_str(),
                point(0), point(1), point(2),
-               normal(0), normal(1), normal(2),
-               depth);
+               normal(0), normal(1), normal(2));
     }
   }
 
@@ -493,8 +495,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   // double proxy_goal_tolerance = 0.1;
   double interpolation_step = config_.quantization_step;
   double interpolation_progress = interpolation_step;
-  collision_detection::CollisionResult collision_result;
-  std::vector<kinematic_state::KinematicStatePtr> states;
+  boost::shared_ptr<collision_detection::CollisionResult> collision_result(new collision_detection::CollisionResult());
   int state_count = 1;
   proxy_states.push_back(start_state);
   while(interpolation_progress <= 1.0 && state_count < MAX_PROXY_STATES)
@@ -510,13 +511,11 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     collision_request.distance = false;
     collision_request.verbose = false;
 
-    collision_result.clear();
-    a_planning_scene->checkCollision(collision_request, collision_result, *point);
+    collision_result->clear();
+    a_planning_scene->checkCollision(collision_request, *collision_result, *point);
 
-    if(collision_result.collision)
+    if(collision_result->collision)
     {
-      const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
-      //collision_detection::refineContactNormals(octomap_object, collision_result, false);
       if(config_.velocity_constraint_only)
       {
         ROS_DEBUG_NAMED("cvx_solver", "Saving the proxy point in collision because we are just doing velocity constraint.");
@@ -539,7 +538,18 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     interpolation_progress += interpolation_step;
     state_count++;
   }
-  // Store the last collision result!
+
+  // Refine normals on the last collision result, if applicable!
+  if(collision_result->collision && config_.refine_normals)
+  {
+    const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+    int modified = collision_detection::refineContactNormals(octomap_object, *collision_result,
+                                                             config_.bbx_search_size,
+                                                             config_.min_angle_change, false,
+                                                             0.5, 1.5); // TODO make these paramters
+    ROS_DEBUG_NAMED("cvx_solver_contacts", "Adjusted %d of %zd contact normals.", modified, collision_result->contact_count );
+  }
+  // Save last collision result.
   last_collision_result = collision_result;
 
 // ====================================================================================================================
