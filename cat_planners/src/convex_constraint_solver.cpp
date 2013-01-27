@@ -462,15 +462,24 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
   //Eigen::VectorXd joint_deltas(N);
   std::map<std::string, double> goal_update;
+  double largest_change = 0.0;
   for(size_t joint_index = 0; joint_index < joint_names.size(); joint_index++)
   {
-    //joint_deltas(joint_index) = cvx.vars.q_d[joint_index];
+    if( fabs(cvx.vars.q_d[joint_index]) > largest_change )
+      largest_change = fabs(cvx.vars.q_d[joint_index]);
     goal_update[joint_names[joint_index]] = cvx.vars.q_d[joint_index] + joint_vector[joint_index];
     ROS_DEBUG_NAMED("cvx_solver_math", "Updated joint [%zd] [%s]: %.3f + %.3f",
                     joint_index,
                     joint_names[joint_index].c_str(),
                     joint_vector[joint_index],
                     cvx.vars.q_d[joint_index]);
+  }
+  if(largest_change < config_.proxy_joint_tolerance)
+  {
+    ROS_DEBUG("Largest joint change [%.3f] is smaller than proxy threshold [%.3f], returning no result.",
+              largest_change, config_.proxy_joint_tolerance);
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+    return false;
   }
   constrained_goal_state->setStateValues(goal_update);
 
@@ -492,51 +501,65 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
   ROS_DEBUG_NAMED("cvx_solver", "Iteratively stepping toward constrained goal state...");
   // TODO enable this
-  // double proxy_goal_tolerance = 0.1;
+  double proxy_goal_tolerance = config_.proxy_joint_tolerance;
   double interpolation_step = config_.quantization_step;
   double interpolation_progress = interpolation_step;
   boost::shared_ptr<collision_detection::CollisionResult> collision_result(new collision_detection::CollisionResult());
   int state_count = 1;
   proxy_states.push_back(start_state);
-  while(interpolation_progress <= 1.0 && state_count < MAX_PROXY_STATES)
-  {
-    // TODO this interpolation scheme might not allow the arm to slide along contacts very well...
-    kinematic_state::KinematicStatePtr point(new kinematic_state::KinematicState(*start_state));
-    start_state->interpolate(*constrained_goal_state, interpolation_progress, *point);
+  bool break_requested = false;
 
-    // get contact set
-    collision_detection::CollisionRequest collision_request;
-    collision_request.max_contacts = config_.max_contacts;
-    collision_request.contacts = true;
-    collision_request.distance = false;
-    collision_request.verbose = false;
+  // create a re-useable collision request query
+  collision_detection::CollisionRequest collision_request;
+  collision_request.max_contacts = config_.max_contacts;
+  collision_request.contacts = true;
+  collision_request.distance = false;
+  collision_request.verbose = false;
+  collision_request.group_name = group_name;
+
+  while(!break_requested && state_count < MAX_PROXY_STATES)
+  {
+    if(interpolation_progress >= 1.0)
+    {
+      interpolation_progress = 1.0;
+      break_requested = true;
+    }
+
+    // TODO this interpolation scheme might not allow the arm to slide along contacts very well...
+    kinematic_state::KinematicStatePtr point(new kinematic_state::KinematicState(start_state->getKinematicModel()));
+    proxy_states.back()->interpolate(*constrained_goal_state, interpolation_progress, *point);
 
     collision_result->clear();
     a_planning_scene->checkCollision(collision_request, *collision_result, *point);
-
     if(collision_result->collision)
     {
       if(config_.velocity_constraint_only)
       {
         ROS_DEBUG_NAMED("cvx_solver", "Saving the proxy point in collision because we are just doing velocity constraint.");
         proxy_states.push_back(point);
+        state_count++;
       }
-      break;
+      break_requested = true;
     }
     else
     {
       proxy_states.push_back(point);
+      state_count++;
     }
     // Check how much time is left
     ros::Duration time_remaining = planning_time_limit - ros::Time::now();
-    ROS_DEBUG_NAMED("cvx_solver", "Completed proxy step %d at %.3f, have %.3f sec of %.3f sec remaining. ",
+    ROS_DEBUG_NAMED("cvx_solver", "Added proxy state %d at %.3f, have %.3f sec of %.3f sec remaining. ",
                     state_count, interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
     if(time_remaining.toSec() < config_.minimum_reserve_time)
       break;
+    if(!break_requested && constrained_goal_state->distance(*proxy_states.back()) < config_.proxy_joint_tolerance)
+    {
+      ROS_DEBUG("Exiting quantization step because we are close enough to the goal.");
+      break;
+    }
 
     // TODO Use proxy_goal_tolerance to exit if we are close enough!
     interpolation_progress += interpolation_step;
-    state_count++;
   }
 
   // Refine normals on the last collision result, if applicable!
