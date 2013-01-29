@@ -15,10 +15,12 @@
 //CVX_Quad cvx;
 CVX_Constraints cvx;
 
+#define ROSCONSOLE_MIN_SEVERITY ROSCONSOLE_SEVERITY_DEBUG
+
 // - - - - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - -
 namespace cat_planners {
 
-static const int MAX_PROXY_STATES = 10;
+static const int MAX_PROXY_STATES = 100;
 
 class ConvexConstraintSolver::DynamicReconfigureImpl
 {
@@ -194,320 +196,88 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
                     joint_index, joint_name.c_str(), limits_min[joint_index], joint_vector[joint_index], limits_max[joint_index]);
   }
 
-// ====================================================================================================================
-// ======== Extract all contact points and normals from previous collision state, get associated Jacobians ============
-// ====================================================================================================================
+  // ====================================================================================================================
+  // ============================================ Extract goal "constraints" ============================================
+  // ====================================================================================================================
 
-  // TODO: we can avoid storing a global collision state if we instead use the planner to take a small step with no constraints to get a useable "goal state".
-  // How much time does that take?
+// ******   TODO    ************  TODO    is this updating properly as we step? *************    TODO    *********
 
-  ROS_DEBUG_NAMED("cvx_solver", "Extracting initial contact constraints.");
+    ROS_DEBUG_NAMED("cvx_solver", "Extracting goal constraints."); // about 140-340 us
+    const moveit_msgs::Constraints &c = req.goal_constraints[0];
 
-  std::vector<Eigen::MatrixXd> contact_jacobians;
-  std::vector<Eigen::Vector3d> contact_normals;
-
-  if(!last_collision_result)
-    last_collision_result.reset(new collision_detection::CollisionResult());
-
-  for( collision_detection::CollisionResult::ContactMap::const_iterator it = last_collision_result->contacts.begin(); it != last_collision_result->contacts.end(); ++it)
-  {
-    std::string contact1 = it->first.first;
-    std::string contact2 = it->first.second;
-    std::string group_contact;
-    if(      jmg->hasLinkModel(contact1) || ee_jmg->hasLinkModel(contact1) ) group_contact = contact1;
-    else if( jmg->hasLinkModel(contact2) || ee_jmg->hasLinkModel(contact2) ) group_contact = contact2;
-    else
+    // ==================================
+    // First do lots of error checking...
+    // ==================================
+    if(c.position_constraints.size() != 1 || c.orientation_constraints.size() != 1)
     {
-      //ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
-      continue;
+      ROS_ERROR("Currently require exactly one position and orientation constraint. (Have %zd and %zd.) Aborting...",
+                c.position_constraints.size(), c.orientation_constraints.size());
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      return false;
     }
+    moveit_msgs::PositionConstraint    pc = c.position_constraints[0];
+    moveit_msgs::OrientationConstraint oc = c.orientation_constraints[0];
+    pc.header.frame_id = ros::names::resolve("/", pc.header.frame_id);
+    oc.header.frame_id = ros::names::resolve("/", oc.header.frame_id);
 
-    const std::vector<collision_detection::Contact>& vec = it->second;
-
-    for(size_t contact_index = 0; contact_index < vec.size(); contact_index++)
+    if(pc.link_name != oc.link_name)
     {
-      Eigen::Vector3d point =   vec[contact_index].pos;
-      Eigen::Vector3d normal =  vec[contact_index].normal;
-      double depth = vec[contact_index].depth;
-
-      // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
-      kinematic_state::LinkState *link_state = start_state->getLinkState(group_contact);
-      Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
-      point = link_T_world*point;
-
-      Eigen::MatrixXd jacobian;
-      if(jsg->getJacobian(group_contact, point, jacobian))
-      {
-        contact_jacobians.push_back(jacobian);
-        if(!config_.refine_normals && contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
-          normal = -1.0*normal;
-        contact_normals.push_back(normal);
-      }
-      ROS_DEBUG_NAMED("cvx_solver_contacts", "Contact between [%s] and [%s] p = [%.3f, %.3f %.3f], n = [%.2f %.2f %.2f]",
-               contact1.c_str(), contact2.c_str(),
-               point(0), point(1), point(2),
-               normal(0), normal(1), normal(2));
+      ROS_ERROR("Position [%s] and orientation [%s] goals are not for the same link. Aborting...",
+                pc.link_name.c_str(), oc.link_name.c_str());
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      return false;
     }
-  }
-
-
-// ====================================================================================================================
-// ============================================ Extract goal "constraints" ============================================
-// ====================================================================================================================
-
-  ROS_DEBUG_NAMED("cvx_solver", "Extracting goal constraints.");
-  const moveit_msgs::Constraints &c = req.goal_constraints[0];
-
-  // ==================================
-  // First do lots of error checking...
-  // ==================================
-  if(c.position_constraints.size() != 1 || c.orientation_constraints.size() != 1)
-  {
-    ROS_ERROR("Currently require exactly one position and orientation constraint. (Have %zd and %zd.) Aborting...",
-              c.position_constraints.size(), c.orientation_constraints.size());
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
-    return false;
-  }
-  moveit_msgs::PositionConstraint    pc = c.position_constraints[0];
-  moveit_msgs::OrientationConstraint oc = c.orientation_constraints[0];
-  pc.header.frame_id = ros::names::resolve("/", pc.header.frame_id);
-  oc.header.frame_id = ros::names::resolve("/", oc.header.frame_id);
-
-  if(pc.link_name != oc.link_name)
-  {
-    ROS_ERROR("Position [%s] and orientation [%s] goals are not for the same link. Aborting...",
-              pc.link_name.c_str(), oc.link_name.c_str());
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
-    return false;
-  }
-  if(pc.constraint_region.primitive_poses.size() != 1)
-  {
-    if(pc.constraint_region.primitive_poses.size() == 0)
-      ROS_ERROR("No primitive_pose specified for position constraint region. Aborting...");
-    if(pc.constraint_region.primitive_poses.size() > 1)
-      ROS_ERROR("Should only specificy one primitice_pose for goal region. Aborting...");
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
-    return false;
-  }
-
-  if(pc.header.frame_id != planning_frame)
-    ROS_WARN("The position goal header [%s] and planning_frame [%s] don't match, things are probably all wrong!",
-             pc.header.frame_id.c_str(), planning_frame.c_str() );
-  if(oc.header.frame_id != planning_frame)
-    ROS_WARN("The orientation goal header [%s] and planning_frame [%s] don't match, things are probably all wrong!",
-             oc.header.frame_id.c_str(), planning_frame.c_str() );
-
-  // ===============================
-  // Now actually do all the math...
-  // ===============================
-  Eigen::Vector3d goal_point;
-  Eigen::Quaterniond goal_quaternion_e;
-  { // scoped so we don't pollute function scope with these message temps
-    const geometry_msgs::Point& msg_goal_point = pc.constraint_region.primitive_poses[0].position;
-    const geometry_msgs::Quaternion& msg_goal_orientation = oc.orientation;
-    goal_point = Eigen::Vector3d(msg_goal_point.x, msg_goal_point.y, msg_goal_point.z);
-    goal_quaternion_e = Eigen::Quaterniond(msg_goal_orientation.w, msg_goal_orientation.x, msg_goal_orientation.y, msg_goal_orientation.z);
-  }
-
-  // Do some transforms...
-  Eigen::Affine3d planning_T_link = start_state->getLinkState(pc.link_name)->getGlobalLinkTransform();
-  Eigen::Vector3d ee_point_in_ee_frame = Eigen::Vector3d(pc.target_point_offset.x, pc.target_point_offset.y, pc.target_point_offset.z);
-  Eigen::Vector3d ee_point_in_planning_frame = planning_T_link*ee_point_in_ee_frame;
-
-  // TODO need to make sure these are expressed in the same frame.
-  Eigen::Vector3d x_error = goal_point - ee_point_in_planning_frame;
-  Eigen::Vector3d delta_x = x_error;
-  double x_error_mag = x_error.norm();
-  if(x_error_mag > config_.max_linear_error)
-    delta_x = x_error/x_error_mag*config_.max_linear_error;
-  ROS_DEBUG_NAMED("cvx_solver_math", "Delta position in planning_frame = [%.3f, %.3f, %.3f]", delta_x[0], delta_x[1], delta_x[2]);
-
-
-  // ===================================
-  // = = = = Rotations are gross = = = =
-  // ===================================
-  Eigen::Quaterniond link_quaternion_e = Eigen::Quaterniond(planning_T_link.rotation());
-  tf::Quaternion link_quaternion_tf, goal_quaternion_tf;
-  tf::quaternionEigenToTF( link_quaternion_e, link_quaternion_tf );
-  tf::quaternionEigenToTF( goal_quaternion_e, goal_quaternion_tf );
-
-  tf::Quaternion delta_quaternion = link_quaternion_tf.inverse()*goal_quaternion_tf;
-  double rotation_angle = delta_quaternion.getAngle();
-  double clipped_rotation_fraction = std::min<double>(1.0, config_.max_angle_error/fabs(rotation_angle));
-  if(clipped_rotation_fraction < 0) ROS_ERROR("Clipped rotation fraction < 0, look into this!");
-
-  tf::Matrix3x3 clipped_delta_matrix;
-  tf::Quaternion clipped_goal_quaternion = link_quaternion_tf.slerp(goal_quaternion_tf, clipped_rotation_fraction);
-  clipped_delta_matrix.setRotation( link_quaternion_tf.inverse()*clipped_goal_quaternion );
-
-
-  tf::Vector3 delta_euler;
-  clipped_delta_matrix.getRPY(delta_euler[0], delta_euler[1], delta_euler[2]);
-  //ROS_DEBUG_NAMED("cvx_solver", "Delta euler in link frame = [%.3f, %.3f, %.3f]", delta_euler[0], delta_euler[1], delta_euler[2]);
-  tf::Matrix3x3 link_matrix(link_quaternion_tf);
-  delta_euler = link_matrix * delta_euler;
-  ROS_DEBUG_NAMED("cvx_solver_math", "Delta euler in planning_frame = [%.3f, %.3f, %.3f]", delta_euler[0], delta_euler[1], delta_euler[2]);
-
-
-  // ===================================
-  // ==== Get end-effector Jacobian ====
-  // ===================================
-  if(ee_control_frame != pc.link_name)
-    ROS_WARN("ee_control_frame [%s] and position_goal link [%s] aren't the same, this could be bad!", ee_control_frame.c_str(), pc.link_name.c_str());
-
-
-  ROS_DEBUG_NAMED("cvx_solver_math", "Getting end-effector Jacobian for local point %.3f, %.3f, %.3f on link [%s]",
-           ee_point_in_ee_frame(0), ee_point_in_ee_frame(1), ee_point_in_ee_frame(2), ee_control_frame.c_str());
-  Eigen::MatrixXd ee_jacobian;
-  if(!jsg->getJacobian(ee_control_frame , ee_point_in_ee_frame , ee_jacobian))
-  {
-    ROS_ERROR("Unable to get end-effector Jacobian! Can't plan, exiting...");
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME;
-    return false;
-  }
-
-  ROS_DEBUG_STREAM_NAMED("cvx_solver_math", "End-effector jacobian in planning frame is: \n" << ee_jacobian);
-
-
-// ====================================================================================================================
-// =================================== Pack into solver data structure, run solver ====================================
-// ====================================================================================================================
-
-  ROS_DEBUG_NAMED("cvx_solver", "Packing data into the cvx solver.");
-
-  // CVX Settings
-  cvx.set_defaults();
-  cvx.setup_indexing();
-  cvx.settings.verbose = 0;
-
-  // ===================================
-  // ======== Load problem data ========
-  // ===================================
-  unsigned int N = num_joints; // number of joints in the chain
-
-  // End-effector Jacobian
-  for(unsigned int row = 0; row < 3; row++ )
-  {
-    for(unsigned int col = 0; col < N; col++ )
+    if(pc.constraint_region.primitive_poses.size() != 1)
     {
-      // CVX matrices are COLUMN-MAJOR!!!
-      cvx.params.J_v[col*3 + row] = ee_jacobian(row,   col);
-      cvx.params.J_w[col*3 + row] = ee_jacobian(row+3, col);
+      if(pc.constraint_region.primitive_poses.size() == 0)
+        ROS_ERROR("No primitive_pose specified for position constraint region. Aborting...");
+      if(pc.constraint_region.primitive_poses.size() > 1)
+        ROS_ERROR("Should only specificy one primitice_pose for goal region. Aborting...");
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      return false;
     }
-  }
 
-  // Weights for pieces of the objective function
-  cvx.params.weight_x[0] = config_.xdot_error_weight; // was 1.0.    Translational error
-  cvx.params.weight_w[0] = config_.wdot_error_weight; // was 0.1.    Angular error (error in radians is numerically much larger than error in meters)
-  cvx.params.weight_q[0] = config_.delta_q_weight;    // was 0.001.  Only want to barely encourage values to stay small...
-
-  // Constraints from contact set
-  unsigned int MAX_CONSTRAINTS = 25;
-  unsigned int constraint_count = std::min<size_t>(MAX_CONSTRAINTS, contact_normals.size());
-  for(unsigned int constraint = 0; constraint < MAX_CONSTRAINTS; constraint++)
-  {
-    if(constraint < constraint_count)
+    if(pc.header.frame_id != planning_frame)
     {
-      // CVX matrices are COLUMN-MAJOR!!!
-      for (int j = 0; j < 3*7; j++) {
-        cvx.params.J_c[constraint][j] = contact_jacobians[constraint](j%3, j/3);
-      }
-      for (int j = 0; j < 3; j++) {
-        cvx.params.normal[constraint][j] = contact_normals[constraint][j];
-      }
+      ROS_WARN("The position goal header [%s] and planning_frame [%s] don't match, have to abort!",
+               pc.header.frame_id.c_str(), planning_frame.c_str() );
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
+      return false;
     }
-    else{
-      //printf("setting to zero\n");
-      for (int j = 0; j < 3*7; j++) {
-        cvx.params.J_c[constraint][j] = 0;
-      }
-      for (int j = 0; j < 3; j++) {
-        cvx.params.normal[constraint][j] = 0;
-      }
+    if(oc.header.frame_id != planning_frame)
+    {
+      ROS_WARN("The orientation goal header [%s] and planning_frame [%s] don't match, have to abort!",
+               oc.header.frame_id.c_str(), planning_frame.c_str() );
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
+      return false;
     }
-  }
 
-  // Joint states and limits
-  for(unsigned int index = 0; index < N; index++ )
-  {
-    cvx.params.q[index] = joint_vector[index];
-    cvx.params.q_min[index] = limits_min[index];
-    cvx.params.q_max[index] = limits_max[index];
-  }
+    // ==================================
+    // Now actually extract goal pose
+    // ==================================
+    Eigen::Vector3d goal_point;
+    Eigen::Quaterniond goal_quaternion_e;
+    { // scoped so we don't pollute function scope with these message temps
+      const geometry_msgs::Point& msg_goal_point = pc.constraint_region.primitive_poses[0].position;
+      const geometry_msgs::Quaternion& msg_goal_orientation = oc.orientation;
+      goal_point = Eigen::Vector3d(msg_goal_point.x, msg_goal_point.y, msg_goal_point.z);
+      goal_quaternion_e = Eigen::Quaterniond(msg_goal_orientation.w, msg_goal_orientation.x, msg_goal_orientation.y, msg_goal_orientation.z);
+    }
 
-  // Goal velocity
-  for(unsigned int index = 0; index < 3; index++ )
-  {
-    cvx.params.x_d[index] = delta_x(index);
-    cvx.params.w_d[index] = delta_euler[index];
-  }
 
-  // ===================================
-  // ====== Solve at high speed! =======
-  // ===================================
-  ROS_DEBUG_NAMED("cvx_solver", "Running solver!");
-  long num_iters = 0;
-  num_iters = cvx.solve();
-  if(!cvx.work.converged)
-  {
-    ROS_WARN("solving failed to converge in %ld iterations.", num_iters);
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
-    return false;
-  }
+  // **********************************************************************************************************************
+  // **********************************************************************************************************************
+  // Loop here
+  // **********************************************************************************************************************
 
-  // ===================================
-  // ====== Unpack solver result =======
-  // ===================================
-  ROS_DEBUG_NAMED("cvx_solver", "Found solution in %ld iterations. Unpacking result...", num_iters);
-
-  //Eigen::VectorXd joint_deltas(N);
-  std::map<std::string, double> goal_update;
-  double largest_change = 0.0;
-  for(size_t joint_index = 0; joint_index < joint_names.size(); joint_index++)
-  {
-    if( fabs(cvx.vars.q_d[joint_index]) > largest_change )
-      largest_change = fabs(cvx.vars.q_d[joint_index]);
-    goal_update[joint_names[joint_index]] = cvx.vars.q_d[joint_index] + joint_vector[joint_index];
-    ROS_DEBUG_NAMED("cvx_solver_math", "Updated joint [%zd] [%s]: %.3f + %.3f",
-                    joint_index,
-                    joint_names[joint_index].c_str(),
-                    joint_vector[joint_index],
-                    cvx.vars.q_d[joint_index]);
-  }
-  if(largest_change < config_.proxy_joint_tolerance)
-  {
-    ROS_DEBUG("Largest joint change [%.3f] is smaller than proxy threshold [%.3f], returning no result.",
-              largest_change, config_.proxy_joint_tolerance);
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
-    return false;
-  }
-  constrained_goal_state->setStateValues(goal_update);
-
-  //  // Compute and print some debug stuff
-  //  if(false)
-  //  {
-  //    Eigen::VectorXd cartesian_deltas = ee_jacobian*joint_deltas;
-  //    ROS_DEBUG_NAMED("cvx_solver_math", "Desired velocity: translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
-  //                    delta_x(0), delta_x(1), delta_x(2),
-  //                    delta_euler[0], delta_euler[1], delta_euler[2]);
-  //    ROS_DEBUG_NAMED("cvx_solver_math", "Computed velocity:    translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
-  //                    cartesian_deltas(0), cartesian_deltas(1), cartesian_deltas(2),
-  //                    cartesian_deltas(3), cartesian_deltas(4), cartesian_deltas(5));
-  //  }
-
-// ====================================================================================================================
-// ================== Step toward constrained goal, checking for new collisions along the way =========================
-// ====================================================================================================================
-
-  ROS_DEBUG_NAMED("cvx_solver", "Iteratively stepping toward constrained goal state...");
-  // TODO enable this
-  double proxy_goal_tolerance = config_.proxy_joint_tolerance;
-  double interpolation_step = config_.quantization_step;
-  double interpolation_progress = interpolation_step;
-  boost::shared_ptr<collision_detection::CollisionResult> collision_result(new collision_detection::CollisionResult());
-  int state_count = 1;
-  proxy_states.push_back(start_state);
+  // Check how much time is left
+  ros::Duration time_remaining = planning_time_limit - ros::Time::now();
   bool break_requested = false;
+//  ROS_DEBUG_NAMED("cvx_solver", "Added proxy state %d at %.3f, have %.3f sec of %.3f sec remaining. ",
+//                  state_count, interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
+
+  proxy_states.push_back(start_state);
+  int state_count = 1;
 
   // create a re-useable collision request query
   collision_detection::CollisionRequest collision_request;
@@ -517,69 +287,315 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   collision_request.verbose = false;
   collision_request.group_name = group_name;
 
-  while(!break_requested && state_count < MAX_PROXY_STATES)
+  while(!break_requested && time_remaining.toSec() < config_.minimum_reserve_time && state_count < MAX_PROXY_STATES)
   {
-    if(interpolation_progress >= 1.0)
-    {
-      interpolation_progress = 1.0;
-      break_requested = true;
-    }
 
-    // TODO this interpolation scheme might not allow the arm to slide along contacts very well...
-    kinematic_state::KinematicStatePtr point(new kinematic_state::KinematicState(start_state->getKinematicModel()));
-    proxy_states.back()->interpolate(*constrained_goal_state, interpolation_progress, *point);
+  // ====================================================================================================================
+  // ======== Extract all contact points and normals from previous collision state, get associated Jacobians ============
+  // ====================================================================================================================
 
-    collision_result->clear();
-    a_planning_scene->checkCollision(collision_request, *collision_result, *point);
-    if(collision_result->collision)
+    // TODO: we can avoid storing a global collision state if we instead use the planner to take a small step with no constraints to get a useable "goal state".
+    // How much time does that take?
+
+    ROS_DEBUG_NAMED("cvx_solver", "Extracting initial contact constraints."); // about 60-200 us
+
+    std::vector<Eigen::MatrixXd> contact_jacobians;
+    std::vector<Eigen::Vector3d> contact_normals;
+
+    if(!last_collision_result)
+      last_collision_result.reset(new collision_detection::CollisionResult());
+
+    for( collision_detection::CollisionResult::ContactMap::const_iterator it = last_collision_result->contacts.begin(); it != last_collision_result->contacts.end(); ++it)
     {
-      if(config_.velocity_constraint_only)
+      std::string contact1 = it->first.first;
+      std::string contact2 = it->first.second;
+      std::string group_contact;
+      if(      jmg->hasLinkModel(contact1) || ee_jmg->hasLinkModel(contact1) ) group_contact = contact1;
+      else if( jmg->hasLinkModel(contact2) || ee_jmg->hasLinkModel(contact2) ) group_contact = contact2;
+      else
       {
-        ROS_DEBUG_NAMED("cvx_solver", "Saving the proxy point in collision because we are just doing velocity constraint.");
-        proxy_states.push_back(point);
-        state_count++;
+        //ROS_WARN("Contact isn't on group [%s], skipping...", req.motion_plan_request.group_name.c_str());
+        continue;
       }
-      break_requested = true;
+
+      const std::vector<collision_detection::Contact>& vec = it->second;
+
+      for(size_t contact_index = 0; contact_index < vec.size(); contact_index++)
+      {
+        Eigen::Vector3d point =   vec[contact_index].pos;
+        Eigen::Vector3d normal =  vec[contact_index].normal;
+        double depth = vec[contact_index].depth;
+
+        // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
+        kinematic_state::LinkState *link_state = proxy_states.back()->getLinkState(group_contact);
+        Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
+        point = link_T_world*point;
+
+        Eigen::MatrixXd jacobian;
+        if(jsg->getJacobian(group_contact, point, jacobian))
+        {
+          contact_jacobians.push_back(jacobian);
+          if(!config_.refine_normals && contact1.find("octomap") != std::string::npos || contact2.find("octomap") != std::string::npos)
+            normal = -1.0*normal;
+          contact_normals.push_back(normal);
+        }
+        ROS_DEBUG_NAMED("cvx_solver_contacts", "Contact between [%s] and [%s] p = [%.3f, %.3f %.3f], n = [%.2f %.2f %.2f]",
+                 contact1.c_str(), contact2.c_str(),
+                 point(0), point(1), point(2),
+                 normal(0), normal(1), normal(2));
+      }
     }
-    else
+
+  // ====================================================================================================================
+  // ============================================ Extract goal "constraints" ============================================
+  // ====================================================================================================================
+
+// ******   TODO    ************  TODO    is this updating properly as we step? *************    TODO    *********
+
+    // ===============================
+    // Now actually do all the math...
+    // ===============================
+
+
+    // Do some transforms...
+    Eigen::Affine3d planning_T_link = proxy_states.back()->getLinkState(pc.link_name)->getGlobalLinkTransform();
+    Eigen::Vector3d ee_point_in_ee_frame = Eigen::Vector3d(pc.target_point_offset.x, pc.target_point_offset.y, pc.target_point_offset.z);
+    Eigen::Vector3d ee_point_in_planning_frame = planning_T_link*ee_point_in_ee_frame;
+
+    // TODO need to make sure these are expressed in the same frame.
+    Eigen::Vector3d x_error = goal_point - ee_point_in_planning_frame;
+    Eigen::Vector3d delta_x = x_error;
+    double x_error_mag = x_error.norm();
+    if(x_error_mag > config_.max_linear_error)
+      delta_x = x_error/x_error_mag*config_.max_linear_error;
+    ROS_DEBUG_NAMED("cvx_solver_math", "Delta position in planning_frame = [%.3f, %.3f, %.3f]", delta_x[0], delta_x[1], delta_x[2]);
+
+
+    // ===================================
+    // = = = = Rotations are gross = = = =
+    // ===================================
+    Eigen::Quaterniond link_quaternion_e = Eigen::Quaterniond(planning_T_link.rotation());
+    tf::Quaternion link_quaternion_tf, goal_quaternion_tf;
+    tf::quaternionEigenToTF( link_quaternion_e, link_quaternion_tf );
+    tf::quaternionEigenToTF( goal_quaternion_e, goal_quaternion_tf );
+
+    tf::Quaternion delta_quaternion = link_quaternion_tf.inverse()*goal_quaternion_tf;
+    double rotation_angle = delta_quaternion.getAngle();
+    double clipped_rotation_fraction = std::min<double>(1.0, config_.max_angle_error/fabs(rotation_angle));
+    if(clipped_rotation_fraction < 0) ROS_ERROR("Clipped rotation fraction < 0, look into this!");
+
+    tf::Matrix3x3 clipped_delta_matrix;
+    tf::Quaternion clipped_goal_quaternion = link_quaternion_tf.slerp(goal_quaternion_tf, clipped_rotation_fraction);
+    clipped_delta_matrix.setRotation( link_quaternion_tf.inverse()*clipped_goal_quaternion );
+
+
+    tf::Vector3 delta_euler;
+    clipped_delta_matrix.getRPY(delta_euler[0], delta_euler[1], delta_euler[2]);
+    //ROS_DEBUG_NAMED("cvx_solver", "Delta euler in link frame = [%.3f, %.3f, %.3f]", delta_euler[0], delta_euler[1], delta_euler[2]);
+    tf::Matrix3x3 link_matrix(link_quaternion_tf);
+    delta_euler = link_matrix * delta_euler;
+    ROS_DEBUG_NAMED("cvx_solver_math", "Delta euler in planning_frame = [%.3f, %.3f, %.3f]", delta_euler[0], delta_euler[1], delta_euler[2]);
+
+
+    // ===================================
+    // ==== Get end-effector Jacobian ====
+    // ===================================
+    if(ee_control_frame != pc.link_name)
+      ROS_WARN("ee_control_frame [%s] and position_goal link [%s] aren't the same, this could be bad!", ee_control_frame.c_str(), pc.link_name.c_str());
+
+
+    ROS_DEBUG_NAMED("cvx_solver_math", "Getting end-effector Jacobian for local point %.3f, %.3f, %.3f on link [%s]",
+             ee_point_in_ee_frame(0), ee_point_in_ee_frame(1), ee_point_in_ee_frame(2), ee_control_frame.c_str());
+    Eigen::MatrixXd ee_jacobian;
+    if(!jsg->getJacobian(ee_control_frame , ee_point_in_ee_frame , ee_jacobian))
     {
-      proxy_states.push_back(point);
+      ROS_ERROR("Unable to get end-effector Jacobian! Can't plan, exiting...");
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME;
+      return false;
+    }
+
+    ROS_DEBUG_STREAM_NAMED("cvx_solver_math", "End-effector jacobian in planning frame is: \n" << ee_jacobian);
+
+  // ====================================================================================================================
+  // =================================== Pack into solver data structure, run solver ====================================
+  // ====================================================================================================================
+
+    ROS_DEBUG_NAMED("cvx_solver", "Packing data into the cvx solver."); // about 70-90 us
+
+    // CVX Settings
+    cvx.set_defaults();
+    cvx.setup_indexing();
+    cvx.settings.verbose = 0;
+
+    // ===================================
+    // ======== Load problem data ========
+    // ===================================
+    unsigned int N = num_joints; // number of joints in the chain
+
+    // End-effector Jacobian
+    for(unsigned int row = 0; row < 3; row++ )
+    {
+      for(unsigned int col = 0; col < N; col++ )
+      {
+        // CVX matrices are COLUMN-MAJOR!!!
+        cvx.params.J_v[col*3 + row] = ee_jacobian(row,   col);
+        cvx.params.J_w[col*3 + row] = ee_jacobian(row+3, col);
+      }
+    }
+
+    // Weights for pieces of the objective function
+    cvx.params.weight_x[0] = config_.xdot_error_weight; // was 1.0.    Translational error
+    cvx.params.weight_w[0] = config_.wdot_error_weight; // was 0.1.    Angular error (error in radians is numerically much larger than error in meters)
+    cvx.params.weight_q[0] = config_.delta_q_weight;    // was 0.001.  Only want to barely encourage values to stay small...
+
+    // Constraints from contact set
+    unsigned int MAX_CONSTRAINTS = 25;
+    unsigned int constraint_count = std::min<size_t>(MAX_CONSTRAINTS, contact_normals.size());
+    for(unsigned int constraint = 0; constraint < MAX_CONSTRAINTS; constraint++)
+    {
+      if(constraint < constraint_count)
+      {
+        // CVX matrices are COLUMN-MAJOR!!!
+        for (int j = 0; j < 3*7; j++) {
+          cvx.params.J_c[constraint][j] = contact_jacobians[constraint](j%3, j/3);
+        }
+        for (int j = 0; j < 3; j++) {
+          cvx.params.normal[constraint][j] = contact_normals[constraint][j];
+        }
+      }
+      else{
+        //printf("setting to zero\n");
+        for (int j = 0; j < 3*7; j++) {
+          cvx.params.J_c[constraint][j] = 0;
+        }
+        for (int j = 0; j < 3; j++) {
+          cvx.params.normal[constraint][j] = 0;
+        }
+      }
+    }
+
+    // Joint states and limits
+    for(unsigned int index = 0; index < N; index++ )
+    {
+      cvx.params.q[index] = joint_vector[index];
+      cvx.params.q_min[index] = limits_min[index];
+      cvx.params.q_max[index] = limits_max[index];
+    }
+
+    // Goal velocity
+    for(unsigned int index = 0; index < 3; index++ )
+    {
+      cvx.params.x_d[index] = delta_x(index);
+      cvx.params.w_d[index] = delta_euler[index];
+    }
+
+    // ===================================
+    // ====== Solve at high speed! =======
+    // ===================================
+    ROS_DEBUG_NAMED("cvx_solver", "Running solver!"); // about 260-300 us
+    long num_iters = 0;
+    num_iters = cvx.solve();
+    if(!cvx.work.converged)
+    {
+      ROS_WARN("solving failed to converge in %ld iterations.", num_iters);
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+      return false;
+    }
+
+    // ===================================
+    // ====== Unpack solver result =======
+    // ===================================
+    ROS_DEBUG_NAMED("cvx_solver", "Found solution in %ld iterations. Unpacking result...", num_iters); // about 120-170 us
+
+    //Eigen::VectorXd joint_deltas(N);
+    std::map<std::string, double> goal_update;
+    double largest_change = 0.0;
+    for(size_t joint_index = 0; joint_index < joint_names.size(); joint_index++)
+    {
+      if( fabs(cvx.vars.q_d[joint_index]) > largest_change )
+        largest_change = fabs(cvx.vars.q_d[joint_index]);
+      goal_update[joint_names[joint_index]] = cvx.vars.q_d[joint_index] + joint_vector[joint_index];
+      ROS_DEBUG_NAMED("cvx_solver_math", "Updated joint [%zd] [%s]: %.3f + %.3f",
+                      joint_index,
+                      joint_names[joint_index].c_str(),
+                      joint_vector[joint_index],
+                      cvx.vars.q_d[joint_index]);
+    }
+    if(largest_change < config_.proxy_joint_tolerance)
+    {
+      ROS_DEBUG_NAMED("cvx_solver", "Largest joint change [%.3f] is smaller than proxy threshold [%.3f]. Exiting...",
+                largest_change, config_.proxy_joint_tolerance);
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+      break;
+    }
+
+    kinematic_state::KinematicStatePtr next_state(new kinematic_state::KinematicState(*start_state));
+    next_state->setStateValues(goal_update);
+
+    //  // Compute and print some debug stuff
+    //  if(false)
+    //  {
+    //    Eigen::VectorXd cartesian_deltas = ee_jacobian*joint_deltas;
+    //    ROS_DEBUG_NAMED("cvx_solver_math", "Desired velocity: translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
+    //                    delta_x(0), delta_x(1), delta_x(2),
+    //                    delta_euler[0], delta_euler[1], delta_euler[2]);
+    //    ROS_DEBUG_NAMED("cvx_solver_math", "Computed velocity:    translate [%.3f, %.3f, %.3f]  euler [%.2f, %.2f, %.2f]",
+    //                    cartesian_deltas(0), cartesian_deltas(1), cartesian_deltas(2),
+    //                    cartesian_deltas(3), cartesian_deltas(4), cartesian_deltas(5));
+    //  }
+
+
+  // ====================================================================================================================
+  // =========================================== Check for new collisions ===============================================
+  // ====================================================================================================================
+
+    ROS_DEBUG_NAMED("cvx_solver", "Checking for collisions in new state.");
+
+    ros::Time collision_start = ros::Time::now();
+    last_collision_result->clear();
+    a_planning_scene->checkCollision(collision_request, *last_collision_result, *next_state);
+    ROS_DEBUG_NAMED("cvx_solver", "Collision check took %.3f ms", (ros::Time::now() - collision_start).toSec() * 1000.0 );
+    // Refine normals on the last collision result, if applicable!
+    if(collision_result->collision && config_.refine_normals)
+    {
+      ros::Time collision_start = ros::Time::now();
+      const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object =
+          a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+      int modified = collision_detection::refineContactNormals(octomap_object, *collision_result,
+                                                               config_.bbx_search_size,
+                                                               config_.min_angle_change, false,
+                                                               0.5, 1.5); // *** TODO *** make these paramters ***
+      ROS_DEBUG_NAMED("cvx_solver", "Adjusted %d of %zd contact normals in %.3f ms",
+                      modified, collision_result->contact_count, (ros::Time::now() - collision_start).toSec() * 1000.0 );
+    }
+    if(collision_result->collision && !config_.velocity_constraint_only)
+    {
+      ROS_DEBUG_NAMED("cvx_solver", "Not saving this point because we are enforcing the position-constraint.");
+    }
+    else // Covers the case of no collision, and collision with velocity constraint only
+    {
+      proxy_states.push_back(next_state);
       state_count++;
     }
+
     // Check how much time is left
     ros::Duration time_remaining = planning_time_limit - ros::Time::now();
-    ROS_DEBUG_NAMED("cvx_solver", "Added proxy state %d at %.3f, have %.3f sec of %.3f sec remaining. ",
-                    state_count, interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
-    if(time_remaining.toSec() < config_.minimum_reserve_time)
-      break;
-    if(!break_requested && constrained_goal_state->distance(*proxy_states.back()) < config_.proxy_joint_tolerance)
-    {
-      ROS_DEBUG("Exiting quantization step because we are close enough to the goal.");
-      break;
-    }
-
-    // TODO Use proxy_goal_tolerance to exit if we are close enough!
-    interpolation_progress += interpolation_step;
+    ROS_DEBUG_NAMED("cvx_solver", "Have %d proxy states, have %.3f sec of %.3f sec remaining. ",
+                    state_count, time_remaining.toSec(), req.allowed_planning_time.toSec());
   }
 
-  // Refine normals on the last collision result, if applicable!
-  if(collision_result->collision && config_.refine_normals)
+
+// ====================================================================================================================
+// ============================= Create a trajectory from the proxy states =================================
+// ====================================================================================================================
+
+  if(state_count < 2)
   {
-    const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object = a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
-    int modified = collision_detection::refineContactNormals(octomap_object, *collision_result,
-                                                             config_.bbx_search_size,
-                                                             config_.min_angle_change, false,
-                                                             0.5, 1.5); // TODO make these paramters
-    ROS_DEBUG_NAMED("cvx_solver_contacts", "Adjusted %d of %zd contact normals.", modified, collision_result->contact_count );
+    ROS_DEBUG_NAMED("cvx_solver", "Only have %d proxy states, not returning a trajectory.", state_count);
+    return false;
   }
-  // Save last collision result.
-  last_collision_result = collision_result;
 
-// ====================================================================================================================
-// ============================= Create a trajectory from the start and result states =================================
-// ====================================================================================================================
-
-  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %d points.", state_count); // TODO should we use intermediate states?
+  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %d points.", state_count);
   trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
   kinematicStateVectorToJointTrajectory(proxy_states, group_name, traj);
   traj.header.frame_id = planning_frame;
@@ -587,7 +603,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   res.group_name = group_name;
   res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
-  ROS_DEBUG_NAMED("cvx_solver", "CVX planning done, returning.");
+  ROS_DEBUG_NAMED("cvx_solver", "CVX planning done in %.3f ms.", (ros::Time::now() - planning_start_time).toSec() * 1000.0);
   return true;
 }
 
