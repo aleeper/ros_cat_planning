@@ -20,8 +20,6 @@ CVX_Constraints cvx;
 // - - - - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - -
 namespace cat_planners {
 
-static const int MAX_PROXY_STATES = 100;
-
 class ConvexConstraintSolver::DynamicReconfigureImpl
 {
 public:
@@ -102,11 +100,23 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   ros::Time planning_time_limit = planning_start_time + req.allowed_planning_time;
   ROS_DEBUG_NAMED("cvx_solver", "Entering ConvexConstraintSolver!");
 
+  const int MAX_PROXY_STATES = config_.max_proxy_states;
+  if(MAX_PROXY_STATES < 1)
+  {
+    ROS_ERROR("Can't have fewer than 1 proxy state, aborting!");
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+    return false;
+  }
+
   std::string planning_frame = ros::names::resolve("/", a_planning_scene->getPlanningFrame());
 
   // We "getCurrentState" just to populate the structure with auxiliary info, then copy in the transform info from the planning request.
-  kinematic_state::KinematicStatePtr start_state(new kinematic_state::KinematicState(a_planning_scene->getCurrentState()));
-  kinematic_state::robotStateToKinematicState(*(a_planning_scene->getTransforms()), req.start_state, *start_state);
+  // Reserve space for upcoming proxy states...
+  std::vector<kinematic_state::KinematicStatePtr> proxy_states;
+  proxy_states.reserve(MAX_PROXY_STATES);
+  int state_count = 1;
+  proxy_states.push_back( kinematic_state::KinematicStatePtr( new kinematic_state::KinematicState(a_planning_scene->getCurrentState())));
+  kinematic_state::robotStateToKinematicState(*(a_planning_scene->getTransforms()), req.start_state, *proxy_states.front());
 
   std::string group_name = req.group_name;
 
@@ -150,14 +160,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   ROS_DEBUG_NAMED("cvx_solver", "Solving for group [%s], end-effector [%s], control frame [%s].",
                   group_name.c_str(), ee_group_name.c_str(), ee_control_frame.c_str());
 
-  // TODO This copying takes about 3 ms!!! Should do something about this...
-
-  // constrained_goal_state is the optimization output before interval stepping, proxy_state will be used as we step around.
-  std::vector<kinematic_state::KinematicStatePtr> proxy_states;
-  proxy_states.reserve(MAX_PROXY_STATES);                                             // reserve plenty of space... // TODO magic number!
-  kinematic_state::KinematicStatePtr constrained_goal_state( new kinematic_state::KinematicState(*start_state));
-
-  const kinematic_state::JointStateGroup* jsg = start_state->getJointStateGroup(group_name);
+  // This can be computed once since it's only a model.
   const kinematic_model::JointModelGroup* ee_jmg = a_planning_scene->getKinematicModel()->getJointModelGroup(ee_group_name);
 
 // ====================================================================================================================
@@ -169,7 +172,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   const std::map<std::string, unsigned int>& joint_index_map = jmg->getJointVariablesIndexMap();
 
   int num_joints = 7; // TODO definitely a magic number here...
-  std::vector<double> limits_min(num_joints), limits_max(num_joints), joint_vector(num_joints);
+  std::vector<double> limits_min(num_joints), limits_max(num_joints);
   std::vector<std::string> joint_names(num_joints);
 
   std::map<std::string, unsigned int>::const_iterator jim_it;
@@ -190,17 +193,14 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       limits_min[joint_index] = -1E3;
       limits_max[joint_index] =  1E3;
     }
-    joint_vector[joint_index] = start_state->getJointState(joint_name)->getVariableValues()[0];
     joint_names[joint_index] = joint_name;
-    ROS_DEBUG_NAMED("cvx_solver_math", "Joint [%d] [%s] has min %.2f, value %.2f, max %.2f",
-                    joint_index, joint_name.c_str(), limits_min[joint_index], joint_vector[joint_index], limits_max[joint_index]);
+    //ROS_DEBUG_NAMED("cvx_solver_math", "Joint [%d] [%s] has min %.2f, value %.2f, max %.2f",
+    //                joint_index, joint_name.c_str(), limits_min[joint_index], joint_vector[joint_index], limits_max[joint_index]);
   }
 
   // ====================================================================================================================
   // ============================================ Extract goal "constraints" ============================================
   // ====================================================================================================================
-
-// ******   TODO    ************  TODO    is this updating properly as we step? *************    TODO    *********
 
     ROS_DEBUG_NAMED("cvx_solver", "Extracting goal constraints."); // about 140-340 us
     const moveit_msgs::Constraints &c = req.goal_constraints[0];
@@ -270,15 +270,6 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   // Loop here
   // **********************************************************************************************************************
 
-  // Check how much time is left
-  ros::Duration time_remaining = planning_time_limit - ros::Time::now();
-  bool break_requested = false;
-//  ROS_DEBUG_NAMED("cvx_solver", "Added proxy state %d at %.3f, have %.3f sec of %.3f sec remaining. ",
-//                  state_count, interpolation_progress, time_remaining.toSec(), req.allowed_planning_time.toSec());
-
-  proxy_states.push_back(start_state);
-  int state_count = 1;
-
   // create a re-useable collision request query
   collision_detection::CollisionRequest collision_request;
   collision_request.max_contacts = config_.max_contacts;
@@ -287,8 +278,18 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   collision_request.verbose = false;
   collision_request.group_name = group_name;
 
-  while(!break_requested && time_remaining.toSec() < config_.minimum_reserve_time && state_count < MAX_PROXY_STATES)
+  // Check how much time is left
+  ros::Duration time_remaining = planning_time_limit - ros::Time::now();
+
+  while(time_remaining.toSec() > config_.minimum_reserve_time
+        && state_count < MAX_PROXY_STATES)
   {
+    const kinematic_state::JointStateGroup* jsg = proxy_states.back()->getJointStateGroup(group_name);
+    std::vector<double> joint_vector(num_joints);
+    for(size_t i = 0; i < joint_names.size(); ++i)
+    {
+      joint_vector[i] = proxy_states.back()->getJointState(joint_names[i])->getVariableValues()[0];
+    }
 
   // ====================================================================================================================
   // ======== Extract all contact points and normals from previous collision state, get associated Jacobians ============
@@ -297,7 +298,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     // TODO: we can avoid storing a global collision state if we instead use the planner to take a small step with no constraints to get a useable "goal state".
     // How much time does that take?
 
-    ROS_DEBUG_NAMED("cvx_solver", "Extracting initial contact constraints."); // about 60-200 us
+    ROS_DEBUG_NAMED("cvx_solver", "Extracting current contact constraints."); // about 60-200 us
 
     std::vector<Eigen::MatrixXd> contact_jacobians;
     std::vector<Eigen::Vector3d> contact_normals;
@@ -347,15 +348,10 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     }
 
   // ====================================================================================================================
-  // ============================================ Extract goal "constraints" ============================================
+  // ============================================= Compute cartesian error ==============================================
   // ====================================================================================================================
 
-// ******   TODO    ************  TODO    is this updating properly as we step? *************    TODO    *********
-
-    // ===============================
-    // Now actually do all the math...
-    // ===============================
-
+    ROS_DEBUG_NAMED("cvx_solver", "Computing cartesian error."); // about 140-340 us
 
     // Do some transforms...
     Eigen::Affine3d planning_T_link = proxy_states.back()->getLinkState(pc.link_name)->getGlobalLinkTransform();
@@ -414,7 +410,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       return false;
     }
 
-    ROS_DEBUG_STREAM_NAMED("cvx_solver_math", "End-effector jacobian in planning frame is: \n" << ee_jacobian);
+    //ROS_DEBUG_STREAM_NAMED("cvx_solver_math", "End-effector jacobian in planning frame is: \n" << ee_jacobian);
 
   // ====================================================================================================================
   // =================================== Pack into solver data structure, run solver ====================================
@@ -529,8 +525,9 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       break;
     }
 
-    kinematic_state::KinematicStatePtr next_state(new kinematic_state::KinematicState(*start_state));
+    kinematic_state::KinematicStatePtr next_state(new kinematic_state::KinematicState(*proxy_states.back()));
     next_state->setStateValues(goal_update);
+    next_state->updateLinkTransforms();
 
     //  // Compute and print some debug stuff
     //  if(false)
@@ -556,32 +553,42 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     a_planning_scene->checkCollision(collision_request, *last_collision_result, *next_state);
     ROS_DEBUG_NAMED("cvx_solver", "Collision check took %.3f ms", (ros::Time::now() - collision_start).toSec() * 1000.0 );
     // Refine normals on the last collision result, if applicable!
-    if(collision_result->collision && config_.refine_normals)
+    if(last_collision_result->collision && config_.refine_normals)
     {
       ros::Time collision_start = ros::Time::now();
       const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object =
           a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
-      int modified = collision_detection::refineContactNormals(octomap_object, *collision_result,
+      int modified = collision_detection::refineContactNormals(octomap_object, *last_collision_result,
                                                                config_.bbx_search_size,
                                                                config_.min_angle_change, false,
                                                                0.5, 1.5); // *** TODO *** make these paramters ***
       ROS_DEBUG_NAMED("cvx_solver", "Adjusted %d of %zd contact normals in %.3f ms",
-                      modified, collision_result->contact_count, (ros::Time::now() - collision_start).toSec() * 1000.0 );
+                      modified, last_collision_result->contact_count, (ros::Time::now() - collision_start).toSec() * 1000.0 );
     }
-    if(collision_result->collision && !config_.velocity_constraint_only)
+    if(last_collision_result->collision)
     {
-      ROS_DEBUG_NAMED("cvx_solver", "Not saving this point because we are enforcing the position-constraint.");
+      if(config_.velocity_constraint_only)
+      {
+        ROS_DEBUG_NAMED("cvx_solver", "Not saving this point because we are enforcing the position-constraint.");
+      }
+      else
+      {
+        ROS_DEBUG_NAMED("cvx_solver", "In collision, but saving this point because we are using velocity contraint only.");
+        proxy_states.push_back(next_state);
+        state_count++;
+      }
+      break;
     }
-    else // Covers the case of no collision, and collision with velocity constraint only
+    else
     {
       proxy_states.push_back(next_state);
       state_count++;
     }
 
     // Check how much time is left
-    ros::Duration time_remaining = planning_time_limit - ros::Time::now();
-    ROS_DEBUG_NAMED("cvx_solver", "Have %d proxy states, have %.3f sec of %.3f sec remaining. ",
-                    state_count, time_remaining.toSec(), req.allowed_planning_time.toSec());
+    time_remaining = planning_time_limit - ros::Time::now();
+    ROS_DEBUG_NAMED("cvx_solver", "Have %d proxy states, have %.3f ms of %.3f ms remaining. ",
+                    state_count, time_remaining.toSec()*1000.0, req.allowed_planning_time.toSec()*1000.0);
   }
 
 
@@ -595,14 +602,25 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     return false;
   }
 
-  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %d points.", state_count);
+  std::vector<kinematic_state::KinematicStatePtr> filtered_proxies;
+  filtered_proxies.reserve(proxy_states.size());
+  for(size_t i = 0; i < proxy_states.size() - 1; ++i)
+  {
+    if( 0 == (i % config_.state_skipping) )
+      filtered_proxies.push_back(proxy_states[i]);
+  }
+  // Always add the last state
+  filtered_proxies.push_back(proxy_states.back());
+
+  ROS_DEBUG_NAMED("cvx_solver", "Creating trajectory with %zd points.", filtered_proxies.size());
   trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
-  kinematicStateVectorToJointTrajectory(proxy_states, group_name, traj);
+  kinematicStateVectorToJointTrajectory(filtered_proxies, group_name, traj);
   traj.header.frame_id = planning_frame;
   res.trajectory_start = req.start_state;
   res.group_name = group_name;
   res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
+  ROS_DEBUG_NAMED("cvx_solver_result", "CVX trajectory has %zd points.", traj.points.size());
   ROS_DEBUG_NAMED("cvx_solver", "CVX planning done in %.3f ms.", (ros::Time::now() - planning_start_time).toSec() * 1000.0);
   return true;
 }
