@@ -173,16 +173,22 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ====================================================================================================================
 
   ROS_DEBUG_NAMED("cvx", "Vectorizing joint info.");  // about 80-120 us
-
-  const std::map<std::string, unsigned int>& joint_index_map = jmg->getJointVariablesIndexMap();
+  const moveit_msgs::Constraints &posture_c = req.goal_constraints[1];
+  const std::vector<moveit_msgs::JointConstraint> &joint_constraints = posture_c.joint_constraints;
+  for(size_t i = 0; i < joint_constraints.size(); i++)
+    ROS_DEBUG_NAMED("cvx_input", "Joint %zd [%s] has position [%.3f] and weight [%.3f].",
+                    i, joint_constraints[i].joint_name.c_str(), joint_constraints[i].position, joint_constraints[i].weight);
 
   int num_joints = 7; // TODO definitely a magic number here...
-  std::vector<double> limits_min(num_joints), limits_max(num_joints);
+  std::vector<double> limits_min(num_joints, -1E3), limits_max(num_joints, 1E3);
+  std::vector<double> joint_posture(num_joints, 0), joint_posture_weight(num_joints, 0), joint_velocity(num_joints, 0);
   std::vector<bool> has_limits(num_joints, false);
   std::vector<std::string> joint_names(num_joints);
 
+  const std::map<std::string, unsigned int>& joint_index_map = jmg->getJointVariablesIndexMap();
   std::map<std::string, unsigned int>::const_iterator jim_it;
-  for(jim_it = joint_index_map.begin(); jim_it != joint_index_map.end(); ++jim_it)
+  int index_count = 0;
+  for(jim_it = joint_index_map.begin(); jim_it != joint_index_map.end(); ++jim_it, ++index_count)
   {
     const std::string& joint_name = jim_it->first;
     unsigned int joint_index = jim_it->second;
@@ -194,16 +200,17 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       limits_max[joint_index] = limit.max_position;
       has_limits[joint_index] = true;
     }
-//    else
-//    {
-//      // TODO this is... sort of a hack. Can we add scalars to the constraints that allow us to "turn them off"?
-////      limits_min[joint_index] = -1E3;
-////      limits_max[joint_index] =  1E3;
-//      has_limits[joint_index] = false;
-//    }
+
+    // joint_posture_weight needs to be normalized as (joint_weight / qmax - qmin)
+    const moveit_msgs::JointConstraint& jc = joint_constraints[index_count];
+    joint_posture_weight[joint_index] = jc.weight * config_.q_posture_weight / (limits_max[joint_index] - limits_min[joint_index]);
+    joint_posture[joint_index] = jc.position;
+
+    // Joint velocity should default to 0 until we figure out if there's a good way to command it
+
     joint_names[joint_index] = joint_name;
-    //ROS_DEBUG_NAMED("cvx_math", "Joint [%d] [%s] has min %.2f, value %.2f, max %.2f",
-    //                joint_index, joint_name.c_str(), limits_min[joint_index], joint_vector[joint_index], limits_max[joint_index]);
+    ROS_DEBUG_NAMED("cvx_input", "Joint [%d] [%s] has min [%.2f], max [%.2f], constraint[%s]",
+                    joint_index, joint_name.c_str(), limits_min[joint_index], limits_max[joint_index], jc.joint_name.c_str());
   }
 
   // ====================================================================================================================
@@ -460,12 +467,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       cvx.params.weight_x[row] = config_.xdot_error_weight; // Translational error
       cvx.params.weight_w[row] = config_.wdot_error_weight; // Angular error (error in radians is numerically much larger than error in meters)
     }
-    if(config_.individual_q_weight)
-      for(unsigned int row = 0; row < 7; row++ )
-      {
-        cvx.params.weight_q[row] = config_.delta_q_weight;    // was 0.001.  Only want to barely encourage values to stay small...
-      }
-    else{
+    if(config_.individual_q_weight) {                       // Joint velocity error
       cvx.params.weight_q[0] = config_.delta_q_w_0;
       cvx.params.weight_q[1] = config_.delta_q_w_1;
       cvx.params.weight_q[2] = config_.delta_q_w_2;
@@ -474,6 +476,15 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
       cvx.params.weight_q[5] = config_.delta_q_w_5;
       cvx.params.weight_q[6] = config_.delta_q_w_6;
     }
+    else
+      for(unsigned int row = 0; row < 7; row++ )
+        cvx.params.weight_q[row] = config_.q_dot_weight;
+
+    for(unsigned int row = 0; row < 7; row++ )              // Posture error
+    {
+      cvx.params.weight_posture[row] = joint_posture_weight[row];
+    }
+
 
     // Constraints from contact set
     unsigned int MAX_CONSTRAINTS = 15;
@@ -507,6 +518,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     for(unsigned int index = 0; index < N; index++ )
     {
       cvx.params.q[index] = joint_vector[index];
+      cvx.params.q_set[index] = joint_posture[index];
+      cvx.params.q_vel[index] = joint_velocity[index];
       cvx.params.q_min[index] = limits_min[index];
       cvx.params.q_max[index] = limits_max[index];
       cvx.params.has_limits[index] = (int)has_limits[index];

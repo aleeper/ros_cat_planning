@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2013-01-29 22:09:07 -0500.  */
+/* Produced by CVXGEN, 2013-01-29 22:28:30 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2012 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2012 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -36,48 +36,65 @@ typedef struct Params_t {
   double w_d[3];
   double J_w[21];
   double weight_w[3];
+  double q_vel[7];
   double weight_q[7];
   double q[7];
   double q_set[7];
   double weight_posture[7];
   double normal_0[3];
   double J_c_0[21];
-  double retreat[1];
+  double retreat_0[1];
   double normal_1[3];
   double J_c_1[21];
+  double retreat_1[1];
   double normal_2[3];
   double J_c_2[21];
+  double retreat_2[1];
   double normal_3[3];
   double J_c_3[21];
+  double retreat_3[1];
   double normal_4[3];
   double J_c_4[21];
+  double retreat_4[1];
   double normal_5[3];
   double J_c_5[21];
+  double retreat_5[1];
   double normal_6[3];
   double J_c_6[21];
+  double retreat_6[1];
   double normal_7[3];
   double J_c_7[21];
+  double retreat_7[1];
   double normal_8[3];
   double J_c_8[21];
+  double retreat_8[1];
   double normal_9[3];
   double J_c_9[21];
+  double retreat_9[1];
   double normal_10[3];
   double J_c_10[21];
+  double retreat_10[1];
   double normal_11[3];
   double J_c_11[21];
+  double retreat_11[1];
   double normal_12[3];
   double J_c_12[21];
+  double retreat_12[1];
   double normal_13[3];
   double J_c_13[21];
+  double retreat_13[1];
   double normal_14[3];
   double J_c_14[21];
+  double retreat_14[1];
   double normal_15[3];
   double J_c_15[21];
+  double retreat_15[1];
   double q_min[7];
   double has_limits[7];
   double q_max[7];
   double *normal[16];
   double *J_c[16];
+  double *retreat[16];
 } Params;
 typedef struct Vars_t {
   double *t_01; /* 3 rows. */
@@ -110,6 +127,7 @@ typedef struct Workspace_t {
   double eq_resid_squared;
   double block_33[1];
   /* Pre-op symbols. */
+  double quad_386989813760[1];
   double quad_585442492416[1];
   int converged;
 } Workspace;
@@ -156,10 +174,10 @@ void pre_ops(void);
 double eval_gap(void);
 void set_defaults(void);
 void setup_pointers(void);
-//void setup_indexed_params(void);
+void setup_indexed_params(void);
 void setup_indexing(void);
 void set_start(void);
-//double eval_objv(void);
+double eval_objv(void);
 void fillrhs_aff(void);
 void fillrhs_cc(void);
 void refine(double *target, double *var);
@@ -173,8 +191,8 @@ long solve(void);
 int main(int argc, char **argv);
 void load_default_data(void);
 
-double eval_objv(void);
-void setup_indexed_params(void);
+//double eval_objv(void);
+//void setup_indexed_params(void);
 void setup_indexed_optvars(void);
 };
 #endif

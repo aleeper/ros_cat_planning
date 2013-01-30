@@ -11,6 +11,7 @@ parameters
   x_d(3,1);    # end-effector desired velocity
   w_d(3,1);    # end-effector desired angular velocity
   q(n,1);      # joint state
+  q_vel(n,1);  # desired joint velocity
   
   # Joint limits
   has_limits(n,n) diagonal nonnegative; # set to zero for continuous joints
@@ -23,7 +24,7 @@ parameters
   # Contact velocity constraints  
   normal[t] (3,1), t=0..c  # contact normals
   J_c[t] (3,n), t=0..c     # contact point linear jacobians
-  retreat nonnegative;     # distance by which to move out of contact
+  retreat[t] nonnegative, t=0..c;  # distance by which to move out of contact
   
   # Weighting matrices for terms in the objective
   weight_x(3,3) diagonal psd ;
@@ -34,12 +35,12 @@ parameters
 end
 
 variables
-  q_d(n,1)   # constrained joint accelerations
+  q_d(n,1)   # constrained joint velocities
 end
 
 minimize
-  quad(x_d - J_v*q_d, weight_x) + quad(w_d - J_w*q_d, weight_w) + quad(q_d, weight_q) + quad(q + q_d - q_set, weight_posture)
+  quad(x_d - J_v*q_d, weight_x) + quad(w_d - J_w*q_d, weight_w) + quad(q_d - q_vel , weight_q) + quad(q + q_d - q_set, weight_posture)
 subject to
-  normal[i]'*J_c[i]*q_d >= retreat, i=0..c
+  normal[i]'*J_c[i]*q_d >= retreat[i], i=0..c
   q_min <= has_limits * (q + q_d) <= q_max;
 end

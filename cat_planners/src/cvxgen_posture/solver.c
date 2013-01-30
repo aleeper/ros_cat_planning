@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2013-01-29 22:09:07 -0500.  */
+/* Produced by CVXGEN, 2013-01-29 22:28:30 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2012 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2012 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -45,36 +45,52 @@ void CVX_Posture::setup_indexed_params(void) {
   /* is undefined. */
   params.normal[0] = params.normal_0;
   params.J_c[0] = params.J_c_0;
+  params.retreat[0] = params.retreat_0;
   params.normal[1] = params.normal_1;
   params.J_c[1] = params.J_c_1;
+  params.retreat[1] = params.retreat_1;
   params.normal[2] = params.normal_2;
   params.J_c[2] = params.J_c_2;
+  params.retreat[2] = params.retreat_2;
   params.normal[3] = params.normal_3;
   params.J_c[3] = params.J_c_3;
+  params.retreat[3] = params.retreat_3;
   params.normal[4] = params.normal_4;
   params.J_c[4] = params.J_c_4;
+  params.retreat[4] = params.retreat_4;
   params.normal[5] = params.normal_5;
   params.J_c[5] = params.J_c_5;
+  params.retreat[5] = params.retreat_5;
   params.normal[6] = params.normal_6;
   params.J_c[6] = params.J_c_6;
+  params.retreat[6] = params.retreat_6;
   params.normal[7] = params.normal_7;
   params.J_c[7] = params.J_c_7;
+  params.retreat[7] = params.retreat_7;
   params.normal[8] = params.normal_8;
   params.J_c[8] = params.J_c_8;
+  params.retreat[8] = params.retreat_8;
   params.normal[9] = params.normal_9;
   params.J_c[9] = params.J_c_9;
+  params.retreat[9] = params.retreat_9;
   params.normal[10] = params.normal_10;
   params.J_c[10] = params.J_c_10;
+  params.retreat[10] = params.retreat_10;
   params.normal[11] = params.normal_11;
   params.J_c[11] = params.J_c_11;
+  params.retreat[11] = params.retreat_11;
   params.normal[12] = params.normal_12;
   params.J_c[12] = params.J_c_12;
+  params.retreat[12] = params.retreat_12;
   params.normal[13] = params.normal_13;
   params.J_c[13] = params.J_c_13;
+  params.retreat[13] = params.retreat_13;
   params.normal[14] = params.normal_14;
   params.J_c[14] = params.J_c_14;
+  params.retreat[14] = params.retreat_14;
   params.normal[15] = params.normal_15;
   params.J_c[15] = params.J_c_15;
+  params.retreat[15] = params.retreat_15;
 }
 void CVX_Posture::setup_indexing(void) {
   setup_pointers();
@@ -102,7 +118,7 @@ double CVX_Posture::eval_objv(void) {
   objv *= 0.5;
   for (i = 0; i < 13; i++)
     objv += work.q[i]*work.x[i];
-  objv += work.quad_585442492416[0];
+  objv += work.quad_386989813760[0]+work.quad_585442492416[0];
   return objv;
 }
 void CVX_Posture::fillrhs_aff(void) {
