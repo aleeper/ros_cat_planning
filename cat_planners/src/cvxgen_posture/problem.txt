@@ -1,0 +1,45 @@
+dimensions
+  n = 7;  # number of joints in the kinematic chain
+  c = 15; # (max) number of contact constraints
+end
+
+parameters
+  
+  # Linearized input kinematics
+  J_v(3,n); # end-effector translation jacobian
+  J_w(3,n); # end-effector rotation jacobian   
+  x_d(3,1);    # end-effector desired velocity
+  w_d(3,1);    # end-effector desired angular velocity
+  q(n,1);      # joint state
+  
+  # Joint limits
+  has_limits(n,n) diagonal nonnegative; # set to zero for continuous joints
+  q_min (n,1); # joint limits min
+  q_max(n,1);  # joint limits max  
+  
+  # Posture control
+  q_set(n,1); # The posture set point, e.g. 1/2*(qmax - qmin)
+  
+  # Contact velocity constraints  
+  normal[t] (3,1), t=0..c  # contact normals
+  J_c[t] (3,n), t=0..c     # contact point linear jacobians
+  retreat nonnegative;     # distance by which to move out of contact
+  
+  # Weighting matrices for terms in the objective
+  weight_x(3,3) diagonal psd ;
+  weight_w(3,3) diagonal psd ;
+  weight_q(n,n) diagonal psd ;  
+  weight_posture(n,n) diagonal psd ;  # weight * 1/width of the joint range, e.g. 1/(q_max - q_min)
+  
+end
+
+variables
+  q_d(n,1)   # constrained joint accelerations
+end
+
+minimize
+  quad(x_d - J_v*q_d, weight_x) + quad(w_d - J_w*q_d, weight_w) + quad(q_d, weight_q) + quad(q + q_d - q_set, weight_posture)
+subject to
+  normal[i]'*J_c[i]*q_d >= retreat, i=0..c
+  q_min <= has_limits * (q + q_d) <= q_max;
+end

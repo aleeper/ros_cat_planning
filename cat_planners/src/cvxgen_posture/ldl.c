@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2013-01-29 18:49:38 -0500.  */
+/* Produced by CVXGEN, 2013-01-29 22:09:06 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2012 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2012 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -8,7 +8,7 @@
 /* Description: Basic test harness for solver.c. */
 #include "solver.h"
 /* Be sure to place ldl_solve first, so storage schemes are defined by it. */
-void CVX_Extended::ldl_solve(double *target, double *var) {
+void CVX_Posture::ldl_solve(double *target, double *var) {
   int i;
   /* Find var = (L*diag(work.d)*L') \ target, then unpermute. */
   /* Answer goes into var. */
@@ -262,7 +262,7 @@ void CVX_Extended::ldl_solve(double *target, double *var) {
   }
 #endif
 }
-void CVX_Extended::ldl_factor(void) {
+void CVX_Posture::ldl_factor(void) {
   work.d[0] = work.KKT[0];
   if (work.d[0] < 0)
     work.d[0] = settings.kkt_reg;
@@ -1271,7 +1271,7 @@ void CVX_Extended::ldl_factor(void) {
   }
 #endif
 }
-double CVX_Extended::check_factorization(void) {
+double CVX_Posture::check_factorization(void) {
   /* Returns the squared Frobenius norm of A - L*D*L'. */
   double temp, residual;
   /* Only check the lower triangle. */
@@ -1832,7 +1832,7 @@ double CVX_Extended::check_factorization(void) {
   residual += temp*temp;
   return residual;
 }
-void CVX_Extended::matrix_multiply(double *result, double *source) {
+void CVX_Posture::matrix_multiply(double *result, double *source) {
   /* Finds result = A*source. */
   result[0] = work.KKT[263]*source[0]+work.KKT[101]*source[43]+work.KKT[109]*source[44]+work.KKT[117]*source[45]+work.KKT[125]*source[46]+work.KKT[133]*source[47]+work.KKT[141]*source[48]+work.KKT[149]*source[49]+work.KKT[157]*source[50]+work.KKT[165]*source[51]+work.KKT[173]*source[52]+work.KKT[181]*source[53]+work.KKT[189]*source[54]+work.KKT[197]*source[55]+work.KKT[205]*source[56]+work.KKT[213]*source[57]+work.KKT[221]*source[58]+work.KKT[61]*source[59]+work.KKT[75]*source[66]+work.KKT[228]*source[73]+work.KKT[235]*source[74]+work.KKT[242]*source[75]+work.KKT[249]*source[76]+work.KKT[256]*source[77]+work.KKT[264]*source[78];
   result[1] = work.KKT[265]*source[1]+work.KKT[102]*source[43]+work.KKT[110]*source[44]+work.KKT[118]*source[45]+work.KKT[126]*source[46]+work.KKT[134]*source[47]+work.KKT[142]*source[48]+work.KKT[150]*source[49]+work.KKT[158]*source[50]+work.KKT[166]*source[51]+work.KKT[174]*source[52]+work.KKT[182]*source[53]+work.KKT[190]*source[54]+work.KKT[198]*source[55]+work.KKT[206]*source[56]+work.KKT[214]*source[57]+work.KKT[222]*source[58]+work.KKT[63]*source[60]+work.KKT[77]*source[67]+work.KKT[229]*source[73]+work.KKT[236]*source[74]+work.KKT[243]*source[75]+work.KKT[250]*source[76]+work.KKT[257]*source[77]+work.KKT[266]*source[78];
@@ -1914,7 +1914,7 @@ void CVX_Extended::matrix_multiply(double *result, double *source) {
   result[77] = work.KKT[256]*source[0]+work.KKT[257]*source[1]+work.KKT[258]*source[2]+work.KKT[259]*source[3]+work.KKT[260]*source[4]+work.KKT[261]*source[5]+work.KKT[262]*source[6]+work.KKT[97]*source[11];
   result[78] = work.KKT[264]*source[0]+work.KKT[266]*source[1]+work.KKT[268]*source[2]+work.KKT[270]*source[3]+work.KKT[272]*source[4]+work.KKT[274]*source[5]+work.KKT[276]*source[6]+work.KKT[99]*source[12];
 }
-double CVX_Extended::check_residual(double *target, double *multiplicand) {
+double CVX_Posture::check_residual(double *target, double *multiplicand) {
   /* Returns the squared 2-norm of lhs - A*rhs. */
   /* Reuses v to find the residual. */
   int i;
@@ -1926,14 +1926,14 @@ double CVX_Extended::check_residual(double *target, double *multiplicand) {
   }
   return residual;
 }
-void CVX_Extended::fill_KKT(void) {
-  work.KKT[263] = 2*params.weight_q[0];
-  work.KKT[265] = 2*params.weight_q[1];
-  work.KKT[267] = 2*params.weight_q[2];
-  work.KKT[269] = 2*params.weight_q[3];
-  work.KKT[271] = 2*params.weight_q[4];
-  work.KKT[273] = 2*params.weight_q[5];
-  work.KKT[275] = 2*params.weight_q[6];
+void CVX_Posture::fill_KKT(void) {
+  work.KKT[263] = 2*(params.weight_q[0]+params.weight_posture[0]);
+  work.KKT[265] = 2*(params.weight_q[1]+params.weight_posture[1]);
+  work.KKT[267] = 2*(params.weight_q[2]+params.weight_posture[2]);
+  work.KKT[269] = 2*(params.weight_q[3]+params.weight_posture[3]);
+  work.KKT[271] = 2*(params.weight_q[4]+params.weight_posture[4]);
+  work.KKT[273] = 2*(params.weight_q[5]+params.weight_posture[5]);
+  work.KKT[275] = 2*(params.weight_q[6]+params.weight_posture[6]);
   work.KKT[88] = 2*params.weight_x[0];
   work.KKT[90] = 2*params.weight_x[1];
   work.KKT[92] = 2*params.weight_x[2];

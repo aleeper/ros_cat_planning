@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2013-01-29 18:49:38 -0500.  */
+/* Produced by CVXGEN, 2013-01-29 22:09:07 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2012 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2012 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -7,7 +7,7 @@
 /* Filename: solver.c. */
 /* Description: Main solver file. */
 #include "solver.h"
-double CVX_Extended::eval_gap(void) {
+double CVX_Posture::eval_gap(void) {
   int i;
   double gap;
   gap = 0;
@@ -15,7 +15,7 @@ double CVX_Extended::eval_gap(void) {
     gap += work.z[i]*work.s[i];
   return gap;
 }
-void CVX_Extended::set_defaults(void) {
+void CVX_Posture::set_defaults(void) {
   settings.resid_tol = 1e-6;
   settings.eps = 1e-4;
   settings.max_iters = 25;
@@ -28,13 +28,13 @@ void CVX_Extended::set_defaults(void) {
   settings.better_start = 1;
   settings.kkt_reg = 1e-7;
 }
-void CVX_Extended::setup_pointers(void) {
+void CVX_Posture::setup_pointers(void) {
   work.y = work.x + 13;
   work.s = work.x + 19;
   work.z = work.x + 49;
   vars.q_d = work.x + 0;
 }
-void CVX_Extended::setup_indexed_params(void) {
+void CVX_Posture::setup_indexed_params(void) {
   /* In CVXGEN, you can say */
   /*   parameters */
   /*     A[i] (5,3), i=1..4 */
@@ -45,58 +45,42 @@ void CVX_Extended::setup_indexed_params(void) {
   /* is undefined. */
   params.normal[0] = params.normal_0;
   params.J_c[0] = params.J_c_0;
-  params.retreat[0] = params.retreat_0;
   params.normal[1] = params.normal_1;
   params.J_c[1] = params.J_c_1;
-  params.retreat[1] = params.retreat_1;
   params.normal[2] = params.normal_2;
   params.J_c[2] = params.J_c_2;
-  params.retreat[2] = params.retreat_2;
   params.normal[3] = params.normal_3;
   params.J_c[3] = params.J_c_3;
-  params.retreat[3] = params.retreat_3;
   params.normal[4] = params.normal_4;
   params.J_c[4] = params.J_c_4;
-  params.retreat[4] = params.retreat_4;
   params.normal[5] = params.normal_5;
   params.J_c[5] = params.J_c_5;
-  params.retreat[5] = params.retreat_5;
   params.normal[6] = params.normal_6;
   params.J_c[6] = params.J_c_6;
-  params.retreat[6] = params.retreat_6;
   params.normal[7] = params.normal_7;
   params.J_c[7] = params.J_c_7;
-  params.retreat[7] = params.retreat_7;
   params.normal[8] = params.normal_8;
   params.J_c[8] = params.J_c_8;
-  params.retreat[8] = params.retreat_8;
   params.normal[9] = params.normal_9;
   params.J_c[9] = params.J_c_9;
-  params.retreat[9] = params.retreat_9;
   params.normal[10] = params.normal_10;
   params.J_c[10] = params.J_c_10;
-  params.retreat[10] = params.retreat_10;
   params.normal[11] = params.normal_11;
   params.J_c[11] = params.J_c_11;
-  params.retreat[11] = params.retreat_11;
   params.normal[12] = params.normal_12;
   params.J_c[12] = params.J_c_12;
-  params.retreat[12] = params.retreat_12;
   params.normal[13] = params.normal_13;
   params.J_c[13] = params.J_c_13;
-  params.retreat[13] = params.retreat_13;
   params.normal[14] = params.normal_14;
   params.J_c[14] = params.J_c_14;
-  params.retreat[14] = params.retreat_14;
   params.normal[15] = params.normal_15;
   params.J_c[15] = params.J_c_15;
-  params.retreat[15] = params.retreat_15;
 }
-void CVX_Extended::setup_indexing(void) {
+void CVX_Posture::setup_indexing(void) {
   setup_pointers();
   setup_indexed_params();
 }
-void CVX_Extended::set_start(void) {
+void CVX_Posture::set_start(void) {
   int i;
   for (i = 0; i < 13; i++)
     work.x[i] = 0;
@@ -107,7 +91,7 @@ void CVX_Extended::set_start(void) {
   for (i = 0; i < 30; i++)
     work.z[i] = settings.z_init;
 }
-double CVX_Extended::eval_objv(void) {
+double CVX_Posture::eval_objv(void) {
   int i;
   double objv;
   /* Borrow space in work.rhs. */
@@ -118,10 +102,10 @@ double CVX_Extended::eval_objv(void) {
   objv *= 0.5;
   for (i = 0; i < 13; i++)
     objv += work.q[i]*work.x[i];
-  objv += 0;
+  objv += work.quad_585442492416[0];
   return objv;
 }
-void CVX_Extended::fillrhs_aff(void) {
+void CVX_Posture::fillrhs_aff(void) {
   int i;
   double *r1, *r2, *r3, *r4;
   r1 = work.rhs;
@@ -148,7 +132,7 @@ void CVX_Extended::fillrhs_aff(void) {
   for (i = 0; i < 6; i++)
     r4[i] += work.b[i];
 }
-void CVX_Extended::fillrhs_cc(void) {
+void CVX_Posture::fillrhs_cc(void) {
   int i;
   double *r2;
   double *ds_aff, *dz_aff;
@@ -194,7 +178,7 @@ void CVX_Extended::fillrhs_cc(void) {
   for (i = 0; i < 30; i++)
     r2[i] = work.s_inv[i]*(smu - ds_aff[i]*dz_aff[i]);
 }
-void CVX_Extended::refine(double *target, double *var) {
+void CVX_Posture::refine(double *target, double *var) {
   int i, j;
   double *residual = work.buffer;
   double norm2;
@@ -238,7 +222,7 @@ void CVX_Extended::refine(double *target, double *var) {
   }
 #endif
 }
-double CVX_Extended::calc_ineq_resid_squared(void) {
+double CVX_Posture::calc_ineq_resid_squared(void) {
   /* Calculates the norm ||-Gx - s + h||. */
   double norm2_squared;
   int i;
@@ -253,7 +237,7 @@ double CVX_Extended::calc_ineq_resid_squared(void) {
     norm2_squared += work.buffer[i]*work.buffer[i];
   return norm2_squared;
 }
-double CVX_Extended::calc_eq_resid_squared(void) {
+double CVX_Posture::calc_eq_resid_squared(void) {
   /* Calculates the norm ||-Ax + b||. */
   double norm2_squared;
   int i;
@@ -268,7 +252,7 @@ double CVX_Extended::calc_eq_resid_squared(void) {
     norm2_squared += work.buffer[i]*work.buffer[i];
   return norm2_squared;
 }
-void CVX_Extended::better_start(void) {
+void CVX_Posture::better_start(void) {
   /* Calculates a better starting point, using a similar approach to CVXOPT. */
   /* Not yet speed optimized. */
   int i;
@@ -322,7 +306,7 @@ void CVX_Extended::better_start(void) {
       work.z[i] = z[i] + alpha;
   }
 }
-void CVX_Extended::fillrhs_start(void) {
+void CVX_Posture::fillrhs_start(void) {
   /* Fill rhs with (-q, 0, h, b). */
   int i;
   double *r1, *r2, *r3, *r4;
@@ -339,7 +323,7 @@ void CVX_Extended::fillrhs_start(void) {
   for (i = 0; i < 6; i++)
     r4[i] = work.b[i];
 }
-long CVX_Extended::solve(void) {
+long CVX_Posture::solve(void) {
   int i;
   int iter;
   double *dx, *ds, *dy, *dz;

@@ -45,7 +45,8 @@ link_directories(${Boost_LIBRARY_DIRS})
 add_library(cvx_solvers
   src/cvxgen_quad/cvx.cpp
   src/cvxgen_constraints/cvx.cpp
-  #src/cvxgen_norm1/cvx.cpp
+  src/cvxgen_extended/cvx.cpp
+  src/cvxgen_posture/cvx.cpp
 )
 
 add_library(cat_planners

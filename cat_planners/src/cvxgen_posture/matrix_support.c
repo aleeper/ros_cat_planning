@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2013-01-29 18:49:38 -0500.  */
+/* Produced by CVXGEN, 2013-01-29 22:09:07 -0500.  */
 /* CVXGEN is Copyright (C) 2006-2012 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2012 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -7,7 +7,7 @@
 /* Filename: matrix_support.c. */
 /* Description: Support functions for matrix multiplication and vector filling. */
 #include "solver.h"
-void CVX_Extended::multbymA(double *lhs, double *rhs) {
+void CVX_Posture::multbymA(double *lhs, double *rhs) {
   lhs[0] = -rhs[0]*(-params.J_v[0])-rhs[1]*(-params.J_v[3])-rhs[2]*(-params.J_v[6])-rhs[3]*(-params.J_v[9])-rhs[4]*(-params.J_v[12])-rhs[5]*(-params.J_v[15])-rhs[6]*(-params.J_v[18])-rhs[7]*(-1);
   lhs[1] = -rhs[0]*(-params.J_v[1])-rhs[1]*(-params.J_v[4])-rhs[2]*(-params.J_v[7])-rhs[3]*(-params.J_v[10])-rhs[4]*(-params.J_v[13])-rhs[5]*(-params.J_v[16])-rhs[6]*(-params.J_v[19])-rhs[8]*(-1);
   lhs[2] = -rhs[0]*(-params.J_v[2])-rhs[1]*(-params.J_v[5])-rhs[2]*(-params.J_v[8])-rhs[3]*(-params.J_v[11])-rhs[4]*(-params.J_v[14])-rhs[5]*(-params.J_v[17])-rhs[6]*(-params.J_v[20])-rhs[9]*(-1);
@@ -15,7 +15,7 @@ void CVX_Extended::multbymA(double *lhs, double *rhs) {
   lhs[4] = -rhs[0]*(-params.J_w[1])-rhs[1]*(-params.J_w[4])-rhs[2]*(-params.J_w[7])-rhs[3]*(-params.J_w[10])-rhs[4]*(-params.J_w[13])-rhs[5]*(-params.J_w[16])-rhs[6]*(-params.J_w[19])-rhs[11]*(-1);
   lhs[5] = -rhs[0]*(-params.J_w[2])-rhs[1]*(-params.J_w[5])-rhs[2]*(-params.J_w[8])-rhs[3]*(-params.J_w[11])-rhs[4]*(-params.J_w[14])-rhs[5]*(-params.J_w[17])-rhs[6]*(-params.J_w[20])-rhs[12]*(-1);
 }
-void CVX_Extended::multbymAT(double *lhs, double *rhs) {
+void CVX_Posture::multbymAT(double *lhs, double *rhs) {
   lhs[0] = -rhs[0]*(-params.J_v[0])-rhs[1]*(-params.J_v[1])-rhs[2]*(-params.J_v[2])-rhs[3]*(-params.J_w[0])-rhs[4]*(-params.J_w[1])-rhs[5]*(-params.J_w[2]);
   lhs[1] = -rhs[0]*(-params.J_v[3])-rhs[1]*(-params.J_v[4])-rhs[2]*(-params.J_v[5])-rhs[3]*(-params.J_w[3])-rhs[4]*(-params.J_w[4])-rhs[5]*(-params.J_w[5]);
   lhs[2] = -rhs[0]*(-params.J_v[6])-rhs[1]*(-params.J_v[7])-rhs[2]*(-params.J_v[8])-rhs[3]*(-params.J_w[6])-rhs[4]*(-params.J_w[7])-rhs[5]*(-params.J_w[8]);
@@ -30,7 +30,7 @@ void CVX_Extended::multbymAT(double *lhs, double *rhs) {
   lhs[11] = -rhs[4]*(-1);
   lhs[12] = -rhs[5]*(-1);
 }
-void CVX_Extended::multbymG(double *lhs, double *rhs) {
+void CVX_Posture::multbymG(double *lhs, double *rhs) {
   lhs[0] = -rhs[0]*(-(params.normal_0[0]*params.J_c_0[0]+params.normal_0[1]*params.J_c_0[1]+params.normal_0[2]*params.J_c_0[2]))-rhs[1]*(-(params.normal_0[0]*params.J_c_0[3]+params.normal_0[1]*params.J_c_0[4]+params.normal_0[2]*params.J_c_0[5]))-rhs[2]*(-(params.normal_0[0]*params.J_c_0[6]+params.normal_0[1]*params.J_c_0[7]+params.normal_0[2]*params.J_c_0[8]))-rhs[3]*(-(params.normal_0[0]*params.J_c_0[9]+params.normal_0[1]*params.J_c_0[10]+params.normal_0[2]*params.J_c_0[11]))-rhs[4]*(-(params.normal_0[0]*params.J_c_0[12]+params.normal_0[1]*params.J_c_0[13]+params.normal_0[2]*params.J_c_0[14]))-rhs[5]*(-(params.normal_0[0]*params.J_c_0[15]+params.normal_0[1]*params.J_c_0[16]+params.normal_0[2]*params.J_c_0[17]))-rhs[6]*(-(params.normal_0[0]*params.J_c_0[18]+params.normal_0[1]*params.J_c_0[19]+params.normal_0[2]*params.J_c_0[20]));
   lhs[1] = -rhs[0]*(-(params.normal_1[0]*params.J_c_1[0]+params.normal_1[1]*params.J_c_1[1]+params.normal_1[2]*params.J_c_1[2]))-rhs[1]*(-(params.normal_1[0]*params.J_c_1[3]+params.normal_1[1]*params.J_c_1[4]+params.normal_1[2]*params.J_c_1[5]))-rhs[2]*(-(params.normal_1[0]*params.J_c_1[6]+params.normal_1[1]*params.J_c_1[7]+params.normal_1[2]*params.J_c_1[8]))-rhs[3]*(-(params.normal_1[0]*params.J_c_1[9]+params.normal_1[1]*params.J_c_1[10]+params.normal_1[2]*params.J_c_1[11]))-rhs[4]*(-(params.normal_1[0]*params.J_c_1[12]+params.normal_1[1]*params.J_c_1[13]+params.normal_1[2]*params.J_c_1[14]))-rhs[5]*(-(params.normal_1[0]*params.J_c_1[15]+params.normal_1[1]*params.J_c_1[16]+params.normal_1[2]*params.J_c_1[17]))-rhs[6]*(-(params.normal_1[0]*params.J_c_1[18]+params.normal_1[1]*params.J_c_1[19]+params.normal_1[2]*params.J_c_1[20]));
   lhs[2] = -rhs[0]*(-(params.normal_2[0]*params.J_c_2[0]+params.normal_2[1]*params.J_c_2[1]+params.normal_2[2]*params.J_c_2[2]))-rhs[1]*(-(params.normal_2[0]*params.J_c_2[3]+params.normal_2[1]*params.J_c_2[4]+params.normal_2[2]*params.J_c_2[5]))-rhs[2]*(-(params.normal_2[0]*params.J_c_2[6]+params.normal_2[1]*params.J_c_2[7]+params.normal_2[2]*params.J_c_2[8]))-rhs[3]*(-(params.normal_2[0]*params.J_c_2[9]+params.normal_2[1]*params.J_c_2[10]+params.normal_2[2]*params.J_c_2[11]))-rhs[4]*(-(params.normal_2[0]*params.J_c_2[12]+params.normal_2[1]*params.J_c_2[13]+params.normal_2[2]*params.J_c_2[14]))-rhs[5]*(-(params.normal_2[0]*params.J_c_2[15]+params.normal_2[1]*params.J_c_2[16]+params.normal_2[2]*params.J_c_2[17]))-rhs[6]*(-(params.normal_2[0]*params.J_c_2[18]+params.normal_2[1]*params.J_c_2[19]+params.normal_2[2]*params.J_c_2[20]));
@@ -62,7 +62,7 @@ void CVX_Extended::multbymG(double *lhs, double *rhs) {
   lhs[28] = -rhs[5]*(params.has_limits[5]);
   lhs[29] = -rhs[6]*(params.has_limits[6]);
 }
-void CVX_Extended::multbymGT(double *lhs, double *rhs) {
+void CVX_Posture::multbymGT(double *lhs, double *rhs) {
   lhs[0] = -rhs[0]*(-(params.normal_0[0]*params.J_c_0[0]+params.normal_0[1]*params.J_c_0[1]+params.normal_0[2]*params.J_c_0[2]))-rhs[1]*(-(params.normal_1[0]*params.J_c_1[0]+params.normal_1[1]*params.J_c_1[1]+params.normal_1[2]*params.J_c_1[2]))-rhs[2]*(-(params.normal_2[0]*params.J_c_2[0]+params.normal_2[1]*params.J_c_2[1]+params.normal_2[2]*params.J_c_2[2]))-rhs[3]*(-(params.normal_3[0]*params.J_c_3[0]+params.normal_3[1]*params.J_c_3[1]+params.normal_3[2]*params.J_c_3[2]))-rhs[4]*(-(params.normal_4[0]*params.J_c_4[0]+params.normal_4[1]*params.J_c_4[1]+params.normal_4[2]*params.J_c_4[2]))-rhs[5]*(-(params.normal_5[0]*params.J_c_5[0]+params.normal_5[1]*params.J_c_5[1]+params.normal_5[2]*params.J_c_5[2]))-rhs[6]*(-(params.normal_6[0]*params.J_c_6[0]+params.normal_6[1]*params.J_c_6[1]+params.normal_6[2]*params.J_c_6[2]))-rhs[7]*(-(params.normal_7[0]*params.J_c_7[0]+params.normal_7[1]*params.J_c_7[1]+params.normal_7[2]*params.J_c_7[2]))-rhs[8]*(-(params.normal_8[0]*params.J_c_8[0]+params.normal_8[1]*params.J_c_8[1]+params.normal_8[2]*params.J_c_8[2]))-rhs[9]*(-(params.normal_9[0]*params.J_c_9[0]+params.normal_9[1]*params.J_c_9[1]+params.normal_9[2]*params.J_c_9[2]))-rhs[10]*(-(params.normal_10[0]*params.J_c_10[0]+params.normal_10[1]*params.J_c_10[1]+params.normal_10[2]*params.J_c_10[2]))-rhs[11]*(-(params.normal_11[0]*params.J_c_11[0]+params.normal_11[1]*params.J_c_11[1]+params.normal_11[2]*params.J_c_11[2]))-rhs[12]*(-(params.normal_12[0]*params.J_c_12[0]+params.normal_12[1]*params.J_c_12[1]+params.normal_12[2]*params.J_c_12[2]))-rhs[13]*(-(params.normal_13[0]*params.J_c_13[0]+params.normal_13[1]*params.J_c_13[1]+params.normal_13[2]*params.J_c_13[2]))-rhs[14]*(-(params.normal_14[0]*params.J_c_14[0]+params.normal_14[1]*params.J_c_14[1]+params.normal_14[2]*params.J_c_14[2]))-rhs[15]*(-(params.normal_15[0]*params.J_c_15[0]+params.normal_15[1]*params.J_c_15[1]+params.normal_15[2]*params.J_c_15[2]))-rhs[16]*(-params.has_limits[0])-rhs[23]*(params.has_limits[0]);
   lhs[1] = -rhs[0]*(-(params.normal_0[0]*params.J_c_0[3]+params.normal_0[1]*params.J_c_0[4]+params.normal_0[2]*params.J_c_0[5]))-rhs[1]*(-(params.normal_1[0]*params.J_c_1[3]+params.normal_1[1]*params.J_c_1[4]+params.normal_1[2]*params.J_c_1[5]))-rhs[2]*(-(params.normal_2[0]*params.J_c_2[3]+params.normal_2[1]*params.J_c_2[4]+params.normal_2[2]*params.J_c_2[5]))-rhs[3]*(-(params.normal_3[0]*params.J_c_3[3]+params.normal_3[1]*params.J_c_3[4]+params.normal_3[2]*params.J_c_3[5]))-rhs[4]*(-(params.normal_4[0]*params.J_c_4[3]+params.normal_4[1]*params.J_c_4[4]+params.normal_4[2]*params.J_c_4[5]))-rhs[5]*(-(params.normal_5[0]*params.J_c_5[3]+params.normal_5[1]*params.J_c_5[4]+params.normal_5[2]*params.J_c_5[5]))-rhs[6]*(-(params.normal_6[0]*params.J_c_6[3]+params.normal_6[1]*params.J_c_6[4]+params.normal_6[2]*params.J_c_6[5]))-rhs[7]*(-(params.normal_7[0]*params.J_c_7[3]+params.normal_7[1]*params.J_c_7[4]+params.normal_7[2]*params.J_c_7[5]))-rhs[8]*(-(params.normal_8[0]*params.J_c_8[3]+params.normal_8[1]*params.J_c_8[4]+params.normal_8[2]*params.J_c_8[5]))-rhs[9]*(-(params.normal_9[0]*params.J_c_9[3]+params.normal_9[1]*params.J_c_9[4]+params.normal_9[2]*params.J_c_9[5]))-rhs[10]*(-(params.normal_10[0]*params.J_c_10[3]+params.normal_10[1]*params.J_c_10[4]+params.normal_10[2]*params.J_c_10[5]))-rhs[11]*(-(params.normal_11[0]*params.J_c_11[3]+params.normal_11[1]*params.J_c_11[4]+params.normal_11[2]*params.J_c_11[5]))-rhs[12]*(-(params.normal_12[0]*params.J_c_12[3]+params.normal_12[1]*params.J_c_12[4]+params.normal_12[2]*params.J_c_12[5]))-rhs[13]*(-(params.normal_13[0]*params.J_c_13[3]+params.normal_13[1]*params.J_c_13[4]+params.normal_13[2]*params.J_c_13[5]))-rhs[14]*(-(params.normal_14[0]*params.J_c_14[3]+params.normal_14[1]*params.J_c_14[4]+params.normal_14[2]*params.J_c_14[5]))-rhs[15]*(-(params.normal_15[0]*params.J_c_15[3]+params.normal_15[1]*params.J_c_15[4]+params.normal_15[2]*params.J_c_15[5]))-rhs[17]*(-params.has_limits[1])-rhs[24]*(params.has_limits[1]);
   lhs[2] = -rhs[0]*(-(params.normal_0[0]*params.J_c_0[6]+params.normal_0[1]*params.J_c_0[7]+params.normal_0[2]*params.J_c_0[8]))-rhs[1]*(-(params.normal_1[0]*params.J_c_1[6]+params.normal_1[1]*params.J_c_1[7]+params.normal_1[2]*params.J_c_1[8]))-rhs[2]*(-(params.normal_2[0]*params.J_c_2[6]+params.normal_2[1]*params.J_c_2[7]+params.normal_2[2]*params.J_c_2[8]))-rhs[3]*(-(params.normal_3[0]*params.J_c_3[6]+params.normal_3[1]*params.J_c_3[7]+params.normal_3[2]*params.J_c_3[8]))-rhs[4]*(-(params.normal_4[0]*params.J_c_4[6]+params.normal_4[1]*params.J_c_4[7]+params.normal_4[2]*params.J_c_4[8]))-rhs[5]*(-(params.normal_5[0]*params.J_c_5[6]+params.normal_5[1]*params.J_c_5[7]+params.normal_5[2]*params.J_c_5[8]))-rhs[6]*(-(params.normal_6[0]*params.J_c_6[6]+params.normal_6[1]*params.J_c_6[7]+params.normal_6[2]*params.J_c_6[8]))-rhs[7]*(-(params.normal_7[0]*params.J_c_7[6]+params.normal_7[1]*params.J_c_7[7]+params.normal_7[2]*params.J_c_7[8]))-rhs[8]*(-(params.normal_8[0]*params.J_c_8[6]+params.normal_8[1]*params.J_c_8[7]+params.normal_8[2]*params.J_c_8[8]))-rhs[9]*(-(params.normal_9[0]*params.J_c_9[6]+params.normal_9[1]*params.J_c_9[7]+params.normal_9[2]*params.J_c_9[8]))-rhs[10]*(-(params.normal_10[0]*params.J_c_10[6]+params.normal_10[1]*params.J_c_10[7]+params.normal_10[2]*params.J_c_10[8]))-rhs[11]*(-(params.normal_11[0]*params.J_c_11[6]+params.normal_11[1]*params.J_c_11[7]+params.normal_11[2]*params.J_c_11[8]))-rhs[12]*(-(params.normal_12[0]*params.J_c_12[6]+params.normal_12[1]*params.J_c_12[7]+params.normal_12[2]*params.J_c_12[8]))-rhs[13]*(-(params.normal_13[0]*params.J_c_13[6]+params.normal_13[1]*params.J_c_13[7]+params.normal_13[2]*params.J_c_13[8]))-rhs[14]*(-(params.normal_14[0]*params.J_c_14[6]+params.normal_14[1]*params.J_c_14[7]+params.normal_14[2]*params.J_c_14[8]))-rhs[15]*(-(params.normal_15[0]*params.J_c_15[6]+params.normal_15[1]*params.J_c_15[7]+params.normal_15[2]*params.J_c_15[8]))-rhs[18]*(-params.has_limits[2])-rhs[25]*(params.has_limits[2]);
@@ -77,16 +77,16 @@ void CVX_Extended::multbymGT(double *lhs, double *rhs) {
   lhs[11] = 0;
   lhs[12] = 0;
 }
-void CVX_Extended::multbyP(double *lhs, double *rhs) {
+void CVX_Posture::multbyP(double *lhs, double *rhs) {
   /* TODO use the fact that P is symmetric? */
   /* TODO check doubling / half factor etc. */
-  lhs[0] = rhs[0]*(2*params.weight_q[0]);
-  lhs[1] = rhs[1]*(2*params.weight_q[1]);
-  lhs[2] = rhs[2]*(2*params.weight_q[2]);
-  lhs[3] = rhs[3]*(2*params.weight_q[3]);
-  lhs[4] = rhs[4]*(2*params.weight_q[4]);
-  lhs[5] = rhs[5]*(2*params.weight_q[5]);
-  lhs[6] = rhs[6]*(2*params.weight_q[6]);
+  lhs[0] = rhs[0]*(2*(params.weight_q[0]+params.weight_posture[0]));
+  lhs[1] = rhs[1]*(2*(params.weight_q[1]+params.weight_posture[1]));
+  lhs[2] = rhs[2]*(2*(params.weight_q[2]+params.weight_posture[2]));
+  lhs[3] = rhs[3]*(2*(params.weight_q[3]+params.weight_posture[3]));
+  lhs[4] = rhs[4]*(2*(params.weight_q[4]+params.weight_posture[4]));
+  lhs[5] = rhs[5]*(2*(params.weight_q[5]+params.weight_posture[5]));
+  lhs[6] = rhs[6]*(2*(params.weight_q[6]+params.weight_posture[6]));
   lhs[7] = rhs[7]*(2*params.weight_x[0]);
   lhs[8] = rhs[8]*(2*params.weight_x[1]);
   lhs[9] = rhs[9]*(2*params.weight_x[2]);
@@ -94,14 +94,14 @@ void CVX_Extended::multbyP(double *lhs, double *rhs) {
   lhs[11] = rhs[11]*(2*params.weight_w[1]);
   lhs[12] = rhs[12]*(2*params.weight_w[2]);
 }
-void CVX_Extended::fillq(void) {
-  work.q[0] = 0;
-  work.q[1] = 0;
-  work.q[2] = 0;
-  work.q[3] = 0;
-  work.q[4] = 0;
-  work.q[5] = 0;
-  work.q[6] = 0;
+void CVX_Posture::fillq(void) {
+  work.q[0] = 2*(params.weight_posture[0]*(params.q[0]-params.q_set[0]));
+  work.q[1] = 2*(params.weight_posture[1]*(params.q[1]-params.q_set[1]));
+  work.q[2] = 2*(params.weight_posture[2]*(params.q[2]-params.q_set[2]));
+  work.q[3] = 2*(params.weight_posture[3]*(params.q[3]-params.q_set[3]));
+  work.q[4] = 2*(params.weight_posture[4]*(params.q[4]-params.q_set[4]));
+  work.q[5] = 2*(params.weight_posture[5]*(params.q[5]-params.q_set[5]));
+  work.q[6] = 2*(params.weight_posture[6]*(params.q[6]-params.q_set[6]));
   work.q[7] = 0;
   work.q[8] = 0;
   work.q[9] = 0;
@@ -109,23 +109,23 @@ void CVX_Extended::fillq(void) {
   work.q[11] = 0;
   work.q[12] = 0;
 }
-void CVX_Extended::fillh(void) {
-  work.h[0] = -params.retreat_0[0];
-  work.h[1] = -params.retreat_1[0];
-  work.h[2] = -params.retreat_2[0];
-  work.h[3] = -params.retreat_3[0];
-  work.h[4] = -params.retreat_4[0];
-  work.h[5] = -params.retreat_5[0];
-  work.h[6] = -params.retreat_6[0];
-  work.h[7] = -params.retreat_7[0];
-  work.h[8] = -params.retreat_8[0];
-  work.h[9] = -params.retreat_9[0];
-  work.h[10] = -params.retreat_10[0];
-  work.h[11] = -params.retreat_11[0];
-  work.h[12] = -params.retreat_12[0];
-  work.h[13] = -params.retreat_13[0];
-  work.h[14] = -params.retreat_14[0];
-  work.h[15] = -params.retreat_15[0];
+void CVX_Posture::fillh(void) {
+  work.h[0] = -params.retreat[0];
+  work.h[1] = -params.retreat[0];
+  work.h[2] = -params.retreat[0];
+  work.h[3] = -params.retreat[0];
+  work.h[4] = -params.retreat[0];
+  work.h[5] = -params.retreat[0];
+  work.h[6] = -params.retreat[0];
+  work.h[7] = -params.retreat[0];
+  work.h[8] = -params.retreat[0];
+  work.h[9] = -params.retreat[0];
+  work.h[10] = -params.retreat[0];
+  work.h[11] = -params.retreat[0];
+  work.h[12] = -params.retreat[0];
+  work.h[13] = -params.retreat[0];
+  work.h[14] = -params.retreat[0];
+  work.h[15] = -params.retreat[0];
   work.h[16] = -(params.q_min[0]-params.has_limits[0]*params.q[0]);
   work.h[17] = -(params.q_min[1]-params.has_limits[1]*params.q[1]);
   work.h[18] = -(params.q_min[2]-params.has_limits[2]*params.q[2]);
@@ -141,7 +141,7 @@ void CVX_Extended::fillh(void) {
   work.h[28] = -(params.has_limits[5]*params.q[5]-params.q_max[5]);
   work.h[29] = -(params.has_limits[6]*params.q[6]-params.q_max[6]);
 }
-void CVX_Extended::fillb(void) {
+void CVX_Posture::fillb(void) {
   work.b[0] = -params.x_d[0];
   work.b[1] = -params.x_d[1];
   work.b[2] = -params.x_d[2];
@@ -149,5 +149,6 @@ void CVX_Extended::fillb(void) {
   work.b[4] = -params.w_d[1];
   work.b[5] = -params.w_d[2];
 }
-void CVX_Extended::pre_ops(void) {
+void CVX_Posture::pre_ops(void) {
+  work.quad_585442492416[0] = ((params.q[0]-params.q_set[0])*(params.weight_posture[0]*(params.q[0]-params.q_set[0]))+(params.q[1]-params.q_set[1])*(params.weight_posture[1]*(params.q[1]-params.q_set[1]))+(params.q[2]-params.q_set[2])*(params.weight_posture[2]*(params.q[2]-params.q_set[2]))+(params.q[3]-params.q_set[3])*(params.weight_posture[3]*(params.q[3]-params.q_set[3]))+(params.q[4]-params.q_set[4])*(params.weight_posture[4]*(params.q[4]-params.q_set[4]))+(params.q[5]-params.q_set[5])*(params.weight_posture[5]*(params.q[5]-params.q_set[5]))+(params.q[6]-params.q_set[6])*(params.weight_posture[6]*(params.q[6]-params.q_set[6])));
 }
