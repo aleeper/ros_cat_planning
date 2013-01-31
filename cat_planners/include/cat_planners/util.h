@@ -28,7 +28,7 @@ namespace cat_planners {
     traj.points.resize(num_states);
     for(int i = 0; i < num_states; i++)
     {
-      const std::vector<kinematic_state::JointState*> jsv = states[i]->getJointStateGroup(group_name)->getJointStateVector();
+      const std::vector<kinematic_state::JointState*>& jsv = states[i]->getJointStateGroup(group_name)->getJointStateVector();
       int num_joints = jsv.size();
       if(i == 0) // only do once per trajectory
         traj.joint_names.resize(num_joints);
