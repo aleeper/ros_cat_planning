@@ -7,7 +7,7 @@
 #include <moveit_msgs/MotionPlanResponse.h>
 #include <moveit_msgs/MotionPlanDetailedResponse.h>
 #include <moveit/planning_interface/planning_interface.h>
-#include <moveit/kinematic_state/conversions.h>
+#include <moveit/robot_state/conversions.h>
 #include <ros/ros.h>
 
 namespace cat_planners
@@ -32,21 +32,21 @@ class ConvexConstraintSolver : public planning_interface::Planner
     /**********************************************************/
     /// Subclass must implement methods below
     virtual bool solve(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                       const moveit_msgs::MotionPlanRequest &req,
-                       moveit_msgs::MotionPlanResponse &res) const;
+                       const planning_interface::MotionPlanRequest &req,
+                       planning_interface::MotionPlanResponse &res) const;
 
 
     virtual bool solve(const planning_scene::PlanningSceneConstPtr& planning_scene,
-               const moveit_msgs::MotionPlanRequest &req,
-               moveit_msgs::MotionPlanDetailedResponse &res) const
+               const planning_interface::MotionPlanRequest &req,
+               planning_interface::MotionPlanDetailedResponse &res) const
     {
-      moveit_msgs::MotionPlanResponse res2;
+      planning_interface::MotionPlanResponse res2;
       if (solve(planning_scene, req, res2))
       {
-        res.trajectory_start = res2.trajectory_start;
-        res.trajectory.push_back(res2.trajectory);
-        res.description.push_back("Constrained motion.");
-        res.processing_time.push_back(res2.planning_time);
+        //res.trajectory_start = res2.trajectory_start;
+        res.trajectory_.push_back(res2.trajectory_);
+        res.description_.push_back("Constrained motion.");
+        res.processing_time_.push_back(res2.planning_time_);
         return true;
       }
       return false;

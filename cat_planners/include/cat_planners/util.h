@@ -8,7 +8,7 @@
 #include <moveit_msgs/MotionPlanDetailedResponse.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_interface/planning_interface.h>
-#include <moveit/kinematic_state/conversions.h>
+#include <moveit/robot_state/conversions.h>
 
 
 namespace cat_planners {
@@ -22,29 +22,29 @@ namespace cat_planners {
     return angle;
   }
 
-  inline void kinematicStateVectorToJointTrajectory( const std::vector<kinematic_state::KinematicStatePtr>& states, const std::string& group_name, trajectory_msgs::JointTrajectory & traj)
-  {
-    int num_states = states.size();
-    traj.points.resize(num_states);
-    for(int i = 0; i < num_states; i++)
-    {
-      const std::vector<kinematic_state::JointState*>& jsv = states[i]->getJointStateGroup(group_name)->getJointStateVector();
-      int num_joints = jsv.size();
-      if(i == 0) // only do once per trajectory
-        traj.joint_names.resize(num_joints);
-      traj.points[i].positions.resize(num_joints);
-      for(size_t j = 0 ; j < num_joints; j++)
-      {
-        if( i == 0 ) // only do once per trajectory
-          traj.joint_names[j] = jsv[j]->getName();
-        traj.points[i].positions[j] = jsv[j]->getVariableValues()[0];
-        //if(js.velocity.size()) pt.velocities.push_back(js.velocity[i]);
-      }
-    }
-  }
+//  inline void robotStateVectorToJointTrajectory( const std::vector<robot_state::RobotStatePtr>& states, const std::string& group_name, trajectory_msgs::JointTrajectory & traj)
+//  {
+//    int num_states = states.size();
+//    traj.points.resize(num_states);
+//    for(int i = 0; i < num_states; i++)
+//    {
+//      const std::vector<robot_state::JointState*>& jsv = states[i]->getJointStateGroup(group_name)->getJointStateVector();
+//      int num_joints = jsv.size();
+//      if(i == 0) // only do once per trajectory
+//        traj.joint_names.resize(num_joints);
+//      traj.points[i].positions.resize(num_joints);
+//      for(size_t j = 0 ; j < num_joints; j++)
+//      {
+//        if( i == 0 ) // only do once per trajectory
+//          traj.joint_names[j] = jsv[j]->getName();
+//        traj.points[i].positions[j] = jsv[j]->getVariableValues()[0];
+//        //if(js.velocity.size()) pt.velocities.push_back(js.velocity[i]);
+//      }
+//    }
+//  }
 
 
-  inline void printCollisionInfo(const planning_scene::PlanningScene& ps, const kinematic_state::KinematicState& ks )
+  inline void printCollisionInfo(const planning_scene::PlanningScene& ps, const robot_state::RobotState& ks )
   {
 
     collision_detection::CollisionRequest req;
@@ -78,12 +78,12 @@ namespace cat_planners {
       }
   }
 
-  inline void createKinematicStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                                        kinematic_state::KinematicState &start_state,
-                                        kinematic_state::KinematicState &goal_state,
+  inline void createRobotStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                        robot_state::RobotState &start_state,
+                                        robot_state::RobotState &goal_state,
                                         std::map<std::string, double> &name_map,
                                         double step_size,
-                                        kinematic_state::KinematicStatePtr &point)
+                                        robot_state::RobotStatePtr &point)
   {
     for (std::map<std::string, double>::const_iterator it = name_map.begin() ; it != name_map.end() ; ++it)
     {
@@ -107,11 +107,11 @@ namespace cat_planners {
     }
   }
 
-  inline void createKinematicStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                                 kinematic_state::KinematicState &start_state, kinematic_state::KinematicState &goal_state,
+  inline void createRobotStatePoint(const planning_scene::PlanningSceneConstPtr& planning_scene,
+                                 robot_state::RobotState &start_state, robot_state::RobotState &goal_state,
                                  std::map<std::string, double> &name_map,
                                  unsigned int step_index, unsigned int num_steps,
-                                 kinematic_state::KinematicStatePtr &point)
+                                 robot_state::RobotStatePtr &point)
   {
     for (std::map<std::string, double>::const_iterator it = name_map.begin() ; it != name_map.end() ; ++it)
     {

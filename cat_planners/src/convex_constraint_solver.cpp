@@ -1,7 +1,7 @@
 #include <cat_planners/convex_constraint_solver.h>
 #include <pluginlib/class_list_macros.h>
 #include <moveit/kinematic_model/kinematic_model.h>
-#include <moveit/kinematic_state/kinematic_state.h>
+#include <moveit/robot_state/robot_state.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <cat_planners/util.h>
 #include <tf/transform_datatypes.h>
@@ -74,8 +74,8 @@ boost::shared_ptr<collision_detection::CollisionResult> last_collision_result;
 
 
 bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& a_planning_scene,
-                   const moveit_msgs::MotionPlanRequest &req,
-                   moveit_msgs::MotionPlanResponse &res) const
+                   const planning_interface::MotionPlanRequest &req,
+                   planning_interface::MotionPlanResponse &res) const
 {
   // The raw algorithm laid out in Chan et. al. is as follows:
   //  1. Compute unconstrained motion to go from proxy to goal.
@@ -103,14 +103,14 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ====================================================================================================================
 
   ros::Time planning_start_time = ros::Time::now();
-  ros::Time planning_time_limit = planning_start_time + req.allowed_planning_time;
+  ros::Time planning_time_limit = planning_start_time + ros::Duration(req.allowed_planning_time);
   ROS_DEBUG_NAMED("cvx", "Entering ConvexConstraintSolver!");
 
   const int MAX_PROXY_STATES = config_.max_proxy_states;
   if(MAX_PROXY_STATES < 1)
   {
     ROS_ERROR("Can't have fewer than 1 proxy state, aborting!");
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+    res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
     return false;
   }
 
@@ -118,12 +118,12 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 
   // We "getCurrentState" just to populate the structure with auxiliary info, then copy in the transform info from the planning request.
   // Reserve space for upcoming proxy states...
-  std::vector<kinematic_state::KinematicStatePtr> proxy_states;
+  std::vector<robot_state::RobotStatePtr> proxy_states;
   proxy_states.reserve(MAX_PROXY_STATES);
   int state_count = 1;
-  proxy_states.push_back( kinematic_state::KinematicStatePtr( new kinematic_state::KinematicState(a_planning_scene->getCurrentState())));
-  //kinematic_state::robotStateToKinematicState(*(a_planning_scene->getTransforms()), req.start_state, *proxy_states.front());
-  kinematic_state::robotStateToKinematicState( req.start_state, *proxy_states.front());
+  proxy_states.push_back( robot_state::RobotStatePtr( new robot_state::RobotState(a_planning_scene->getCurrentState())));
+  //robot_state::robotStateToRobotState(*(a_planning_scene->getTransforms()), req.start_state, *proxy_states.front());
+  robot_state::robotStateMsgToRobotState(req.start_state, *proxy_states.front());
 
   std::string group_name = req.group_name;
 
@@ -137,7 +137,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   {
     ROS_WARN("Subgroups are not supported yet! (Group [%s] has %zd subgroups.) Aborting... ",
              group_name.c_str(), subgroup_names.size());
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
+    res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
     return false;
   }
 
@@ -156,7 +156,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(ee_index == -1)
   {
     ROS_WARN("Did not find any end-effectors attached to group [%s]! Aborting...", group_name.c_str());
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
+    res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME;
     return false;
   }
 
@@ -229,7 +229,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       ROS_ERROR("Currently require exactly one position and orientation constraint. (Have %zd and %zd.) Aborting...",
                 c.position_constraints.size(), c.orientation_constraints.size());
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
       return false;
     }
     moveit_msgs::PositionConstraint    pc = c.position_constraints[0];
@@ -241,7 +241,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       ROS_ERROR("Position [%s] and orientation [%s] goals are not for the same link. Aborting...",
                 pc.link_name.c_str(), oc.link_name.c_str());
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
       return false;
     }
     if(pc.constraint_region.primitive_poses.size() != 1)
@@ -250,7 +250,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         ROS_ERROR("No primitive_pose specified for position constraint region. Aborting...");
       if(pc.constraint_region.primitive_poses.size() > 1)
         ROS_ERROR("Should only specificy one primitice_pose for goal region. Aborting...");
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
       return false;
     }
 
@@ -258,14 +258,14 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       ROS_WARN("The position goal header [%s] and planning_frame [%s] don't match, have to abort!",
                pc.header.frame_id.c_str(), planning_frame.c_str() );
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
       return false;
     }
     if(oc.header.frame_id != planning_frame)
     {
       ROS_WARN("The orientation goal header [%s] and planning_frame [%s] don't match, have to abort!",
                oc.header.frame_id.c_str(), planning_frame.c_str() );
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::FRAME_TRANSFORM_FAILURE;
       return false;
     }
 
@@ -302,7 +302,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   while(time_remaining.toSec() > config_.minimum_reserve_time
         && state_count < MAX_PROXY_STATES)
   {
-    const kinematic_state::JointStateGroup* jsg = proxy_states.back()->getJointStateGroup(group_name);
+    const robot_state::JointStateGroup* jsg = proxy_states.back()->getJointStateGroup(group_name);
     std::vector<double> joint_vector(num_joints);
     for(size_t i = 0; i < joint_names.size(); ++i)
     {
@@ -346,7 +346,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
         double depth = vec[contact_index].depth;
 
         // Contact point needs to be expressed with respect to the link; normals should stay in the common frame
-        kinematic_state::LinkState *link_state = proxy_states.back()->getLinkState(group_contact);
+        robot_state::LinkState *link_state = proxy_states.back()->getLinkState(group_contact);
         Eigen::Affine3d link_T_world = link_state->getGlobalCollisionBodyTransform().inverse();
         point = link_T_world*point;
 
@@ -429,7 +429,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     if(!jsg->getJacobian(ee_control_frame , ee_point_in_ee_frame , ee_jacobian))
     {
       ROS_ERROR("Unable to get end-effector Jacobian! Can't plan, exiting...");
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_LINK_NAME;
       return false;
     }
 
@@ -544,7 +544,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     if(!cvx.work.converged)
     {
       ROS_WARN("solving failed to converge in %ld iterations.", num_iters);
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
       return false;
     }
 
@@ -572,11 +572,11 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       ROS_DEBUG_NAMED("cvx", "Largest joint change [%.3f] is smaller than proxy threshold [%.3f]. Exiting...",
                 largest_change, config_.proxy_joint_tolerance);
-      res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+      res.error_code_.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
       break;
     }
 
-    kinematic_state::KinematicStatePtr next_state(new kinematic_state::KinematicState(*proxy_states.back()));
+    robot_state::RobotStatePtr next_state(new robot_state::RobotState(*proxy_states.back()));
     next_state->setStateValues(goal_update);
     next_state->updateLinkTransforms();
 
@@ -648,7 +648,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if( first_collision_index > 0
       && (first_collision_index + 1 < proxy_states.size()) ) // if last state is colliding, so be it
   {
-    kinematic_state::KinematicStatePtr& colliding_state = proxy_states[first_collision_index];
+    robot_state::RobotStatePtr& colliding_state = proxy_states[first_collision_index];
     double distance = colliding_state->distance(*proxy_states.back());
     if(distance < config_.limit_cycle_threshold)
     {
@@ -666,27 +666,29 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     ROS_DEBUG_NAMED("cvx", "Only have %d proxy states, not returning a trajectory.", state_count);
     return false;
   }
+  //robot_trajectory::RobotTrajectory rt;
 
-  std::vector<kinematic_state::KinematicStatePtr> filtered_proxies;
-  filtered_proxies.reserve(proxy_states.size());
+  robot_trajectory::RobotTrajectoryPtr filtered_proxies(new robot_trajectory::RobotTrajectory(a_planning_scene->getKinematicModel(), group_name));
+  //filtered_proxies.reserve(proxy_states.size());
   for(size_t i = 0; i < proxy_states.size() - 1; ++i)
   {
     if( 0 == (i % config_.state_skipping) )
-      filtered_proxies.push_back(proxy_states[i]);
+      filtered_proxies->addSuffixWayPoint(proxy_states[i], 0);
   }
   // Always add the last state
-  filtered_proxies.push_back(proxy_states.back());
+  filtered_proxies->addSuffixWayPoint(proxy_states.back(), 0);
 
-  ROS_DEBUG_NAMED("cvx", "Creating trajectory with %zd points.", filtered_proxies.size());
-  trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
-  kinematicStateVectorToJointTrajectory(filtered_proxies, group_name, traj);
-  traj.header.frame_id = planning_frame;
-  res.trajectory_start = req.start_state;
-  res.group_name = group_name;
-  res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+//  ROS_DEBUG_NAMED("cvx", "Creating trajectory with %zd points.", filtered_proxies.size());
+//  trajectory_msgs::JointTrajectory& traj = res.trajectory.joint_trajectory;
+//  robotStateVectorToJointTrajectory(filtered_proxies, group_name, traj);
+//  traj.header.frame_id = planning_frame;
+  ros::Duration time_used = ros::Time::now() - planning_start_time;
+  res.trajectory_ = filtered_proxies;
+  res.planning_time_ = time_used.toSec();
+  res.error_code_.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
-  ROS_DEBUG_NAMED("cvx_result", "CVX trajectory has %zd points.", traj.points.size());
-  ROS_DEBUG_NAMED("cvx", "CVX planning done in %.3f ms.", (ros::Time::now() - planning_start_time).toSec() * 1000.0);
+  ROS_DEBUG_NAMED("cvx_result", "CVX trajectory has %zd points.", res.trajectory_->getWayPointCount());
+  ROS_DEBUG_NAMED("cvx", "CVX planning done in %.3f ms.", time_used.toSec() * 1000.0);
   return true;
 }
 
