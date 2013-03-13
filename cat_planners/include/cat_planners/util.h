@@ -89,7 +89,7 @@ namespace cat_planners {
     {
       double sv = start_state.getJointState(it->first)->getVariableValues()[0];
       double gv = goal_state.getJointState(it->first)->getVariableValues()[0];
-      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getVariableLimits();
+      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getRobotModel()->getJointModel(it->first)->getVariableLimits();
       double u = 0;
       //moveit_msgs::JointLimits &limit = limits[0];
 
@@ -117,7 +117,7 @@ namespace cat_planners {
     {
       double sv = start_state.getJointState(it->first)->getVariableValues()[0];
       double gv = goal_state.getJointState(it->first)->getVariableValues()[0];
-      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getKinematicModel()->getJointModel(it->first)->getVariableLimits();
+      std::vector<moveit_msgs::JointLimits> limits = planning_scene->getRobotModel()->getJointModel(it->first)->getVariableLimits();
       double u = 0;
       //moveit_msgs::JointLimits &limit = limits[0];
 

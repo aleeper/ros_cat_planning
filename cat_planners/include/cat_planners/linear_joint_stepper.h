@@ -21,7 +21,7 @@ class LinearJointStepper : public planning_interface::Planner
 
     /*********************************************************/
     /// Subclass may implement methods below
-    virtual void init(const kinematic_model::KinematicModelConstPtr& model) {}
+    virtual void init(const robot_model::RobotModelConstPtr& model) {}
 
     /// Get a short string that identifies the planning interface
     virtual std::string getDescription(void) const { return "Adam's potential field planner/solver."; }

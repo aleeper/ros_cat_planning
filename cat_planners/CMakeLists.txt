@@ -42,7 +42,7 @@ include_directories(include
 link_directories(${catkin_LIBRARY_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-add_definitions( -DROSCONSOLE_MIN_SEVERITY=ROSCONSOLE_SEVERITY_INFO )
+#add_definitions( -DROSCONSOLE_MIN_SEVERITY=ROSCONSOLE_SEVERITY_INFO )
 
 add_library(cvx_solvers
   src/cvxgen_quad/cvx.cpp

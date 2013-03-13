@@ -1,6 +1,6 @@
 #include <cat_planners/convex_constraint_solver.h>
 #include <pluginlib/class_list_macros.h>
-#include <moveit/kinematic_model/kinematic_model.h>
+#include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <cat_planners/util.h>
@@ -77,26 +77,6 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
                    const planning_interface::MotionPlanRequest &req,
                    planning_interface::MotionPlanResponse &res) const
 {
-  // The raw algorithm laid out in Chan et. al. is as follows:
-  //  1. Compute unconstrained motion to go from proxy to goal.
-  //  2. Get the current contact set by moving the proxy toward the goal by some epsilon and get all collision points.
-  //  3. Compute constrained motion (convex solver).
-  //  4. Compute collisions along the constrained motion path.
-  //  5. Set proxy to stop at the first new contact along path.
-
-
-  // In our framework this will look more like this:
-  // Outside ths planner:
-  //  1. Set cartesian goal as a "constraint".
-
-  // Inside the planner:
-  //  1. Get the "current" contact set from the last collision result
-  //     (or, take an unconstrained step to get the contact set, but then reset the proxy)
-  //  2. Compute constrained motion (convex solver).
-  //  3. Subdivide motion subject to some sort of minimum feature size.
-  //  4. Move proxy in steps, checking for colliding state along the way. Optionally use interval bisection to refine.
-
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -/
 
 // ====================================================================================================================
 // ================================== Begin by extracting state and model information =================================
@@ -128,8 +108,8 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   std::string group_name = req.group_name;
 
   // Get the main group (for planning)
-  const boost::shared_ptr<const srdf::Model>& srdf = a_planning_scene->getKinematicModel()->getSRDF();
-  const kinematic_model::JointModelGroup* jmg = a_planning_scene->getKinematicModel()->getJointModelGroup(group_name);
+  const boost::shared_ptr<const srdf::Model>& srdf = a_planning_scene->getRobotModel()->getSRDF();
+  const robot_model::JointModelGroup* jmg = a_planning_scene->getRobotModel()->getJointModelGroup(group_name);
 
   // Check if there are subgroups...
   const std::vector<std::string>& subgroup_names = jmg->getSubgroupNames();
@@ -168,7 +148,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
                   group_name.c_str(), ee_group_name.c_str(), ee_control_frame.c_str());
 
   // This can be computed once since it's only a model.
-  const kinematic_model::JointModelGroup* ee_jmg = a_planning_scene->getKinematicModel()->getJointModelGroup(ee_group_name);
+  const robot_model::JointModelGroup* ee_jmg = a_planning_scene->getRobotModel()->getJointModelGroup(ee_group_name);
 
 // ====================================================================================================================
 // ============== Construct vectors for joint information so that we can easily work with them later ==================
@@ -609,7 +589,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     {
       ros::Time collision_start = ros::Time::now();
       const collision_detection::CollisionWorld::ObjectConstPtr& octomap_object =
-          a_planning_scene->getCollisionWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+          a_planning_scene->getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
       int modified = collision_detection::refineContactNormals(octomap_object, *last_collision_result,
                                                                config_.bbx_search_size,
                                                                config_.min_angle_change, false,
@@ -641,7 +621,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
     // Check how much time is left
     time_remaining = planning_time_limit - ros::Time::now();
     ROS_DEBUG_NAMED("cvx", "Have %d proxy states, have %.3f ms of %.3f ms remaining. ",
-                    state_count, time_remaining.toSec()*1000.0, req.allowed_planning_time.toSec()*1000.0);
+                    state_count, time_remaining.toSec()*1000.0, req.allowed_planning_time*1000.0);
   }
 
   // Check if our roll-out just resulted in bouncing around in collision
@@ -668,7 +648,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   }
   //robot_trajectory::RobotTrajectory rt;
 
-  robot_trajectory::RobotTrajectoryPtr filtered_proxies(new robot_trajectory::RobotTrajectory(a_planning_scene->getKinematicModel(), group_name));
+  robot_trajectory::RobotTrajectoryPtr filtered_proxies(new robot_trajectory::RobotTrajectory(a_planning_scene->getRobotModel(), group_name));
   //filtered_proxies.reserve(proxy_states.size());
   for(size_t i = 0; i < proxy_states.size() - 1; ++i)
   {

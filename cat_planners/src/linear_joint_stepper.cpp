@@ -1,7 +1,7 @@
 #include <cat_planners/util.h>
 #include <cat_planners/linear_joint_stepper.h>
 #include <pluginlib/class_list_macros.h>
-#include <moveit/kinematic_model/kinematic_model.h>
+//#include <moveit/robot_model/robot_model.h>
 #include <moveit/planning_interface/planning_interface.h>
 
 
