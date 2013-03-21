@@ -90,7 +90,7 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
   if(MAX_PROXY_STATES < 1)
   {
     ROS_ERROR("Can't have fewer than 1 proxy state, aborting!");
-    res.error_code_.val = moveit_msgs::MoveItErrorCodes::FAILURE;
+    res.error_code_.val = moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS;
     return false;
   }
 
@@ -641,9 +641,9 @@ bool ConvexConstraintSolver::solve(const planning_scene::PlanningSceneConstPtr& 
 // ============================= Create a trajectory from the proxy states =================================
 // ====================================================================================================================
 
-  if(state_count < 2)
+  if(state_count < 1)
   {
-    ROS_DEBUG_NAMED("cvx", "Only have %d proxy states, not returning a trajectory.", state_count);
+    ROS_WARN_NAMED("cvx", "Only have %d proxy states, not returning a trajectory.", state_count);
     return false;
   }
   //robot_trajectory::RobotTrajectory rt;
