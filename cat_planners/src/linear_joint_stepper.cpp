@@ -14,7 +14,7 @@ bool LinearJointStepper::solve(const planning_scene::PlanningSceneConstPtr& plan
   ROS_DEBUG("Solving using LinearJointStepper!");
 
   robot_state::RobotState start_state = planning_scene->getCurrentState();
-  robot_state::robotStateMsgToRobotState(*(planning_scene->getTransforms()), req.start_state, start_state);
+  robot_state::robotStateMsgToRobotState(planning_scene->getTransforms(), req.start_state, start_state);
 
   robot_state::RobotState goal_state = start_state;
   const moveit_msgs::Constraints &c = req.goal_constraints[0];
