@@ -60,8 +60,13 @@ add_dependencies(cat_planners moveit_msgs_gencpp)
 target_link_libraries(cat_planners cvx_solvers)
 
 
-install(FILES cat_planners_plugin_description.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(TARGETS cat_planners cvx_solvers LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+
+install(FILES lib/cat_planners_plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
+install(DIRECTORY include/ DESTINATION include)
+
+
 
 
 
