@@ -62,7 +62,7 @@ target_link_libraries(cat_planners cvx_solvers)
 
 install(TARGETS cat_planners cvx_solvers LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 
-install(FILES lib/cat_planners_plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(FILES cat_planners_plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 install(DIRECTORY include/ DESTINATION include)
 
